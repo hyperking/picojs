@@ -286,4 +286,4 @@ function Component(obj){
     update();
 }
 const Pico = Component
-export default Pico
+export default Pico;
