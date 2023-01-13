@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Pico JS</title>
+    <script src="./build/picojs.umd.js.gz"></script>
+    <!-- <script src="./src/main.ts" type="module"></script> -->
+    <script type="module">
+        window.app = new Pico({
+            name: "demo",
+            root: document.getElementById('app'),
+            actions: {
+                increment: (state) => {
+                    state.count += 1;
+                },
+                decrement: (state) => {
+                    state.count -= 1;
+                },
+                addfruits( state ){ 
+                    if(!state.todo){return;}
+                    state.todos = [...state.todos, state.todo]
+                    state.todo = '';
+                },
+                handleMousemove(state, event) {
+                    const x = event.clientX;
+                    const y = event.clientY;
+                    console.log(x, y)
+                }
+            },
+            state: {
+                count: 0,
+                items: ["one","two","three"],
+                todos: ["Uninstall ReactJS"],
+                todo: ''
+            },
+            view: (state) => { 
+                return `
+                <div id="love" class="alert this that" data-foo="bar">
+                You have clicked {state.count} times!!!
+                <h1 class="{state.count > 3 ? 'red' : 'blue'}">Count: {state.count}</h1>
+                </div>
+                <ul class="static-list">
+                ${state.items.map(item => `<li>${item}</li>`).join("")}
+                </ul>
+                <ul class="dyn-list" data-for="thing in fruits">
+                    <li data-when="fruits" class="{i % 2===0 ? 'even': 'odd'}">{state.thing}: {i % 2===0 ? 'yay':'nay'}</li>
+                    ---
+                </ul>
+                <button onclick="increment">Count +</button>
+                <button onclick="decrement">Count -</button><br/>
+                <input type="text" data-bind:value="todo" /><br/>{state.todo}:{state.count}
+                <button onclick="addfruits">Add fruits</button>`
+            }
+        })
+    </script>
+</head>
+
+<body>
+    <style>
+        .alert {
+            padding: 1em;
+            background: chartreuse;
+            color: #054205;
+        }
+
+        .red {
+            color: red;
+        }
+
+        .blue {
+            color: blue;
+        }
+
+        .danger {
+            background: red;
+            color: white;
+        }
+    </style>
+    <h1>Basic sandbox demo</h1>
+    <div id="app"></div>
+</body>
+
+</html>

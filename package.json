@@ -1,0 +1,15 @@
+{
+  "name": "picojs",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run buildjs",
+    "buildjs": "vite build"
+  },
+  "author": "Derry Livenski",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^4.0.4",
+    "vite-plugin-compression": "^0.5.1"
+  }
+}

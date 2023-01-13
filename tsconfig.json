@@ -1,0 +1,16 @@
+{
+    "paths":{
+      "@src": "src"
+    },
+    "compilerOptions": {
+      "target": "ES2017",
+      "module": "ES6",
+      "baseUrl": "./src",
+      "outDir": "./build",
+      "allowJs": true,
+      "checkJs": false,
+      "isolatedModules": true
+    },
+    "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js"]
+}
+  
