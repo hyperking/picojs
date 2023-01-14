@@ -7,7 +7,7 @@
     "buildjs": "vite build"
   },
   "author": "Derry Livenski",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "vite": "^4.0.4",
     "vite-plugin-compression": "^0.5.1"
