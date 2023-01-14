@@ -1,2 +1,2 @@
-import Pico from "./pico";
+import Pico from "@src/pico";
 export default Pico;

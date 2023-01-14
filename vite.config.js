@@ -11,7 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-    '@src': '/src',
+      "@src": ["/src"]
     }
   },
   build:{
@@ -19,8 +19,8 @@ export default defineConfig({
     minify: true,
     reportCompressedSize: true,
     lib: {
-      entry: './src/lib.ts', // Main entrypoint to compile
-      name: 'Pico', //Global library name in browser. Be sure to export default YourModuleNameHere in your entrypoint
+      entry: './src/lib.ts',
+      name: 'Pico',
       formats: ['umd'],
     },
     outDir: './build'

@@ -1,57 +1,31 @@
-class IProp {
-    $tmpl: string;
-    $attr: string;
-    $should_update?: boolean = true;
-    $nodeEl: HTMLElement; 
-    $data_refs?: string[];
-    $type: string = 'IProp';
-    $render: Function;
-
-    constructor(tml:string, attr:string, nodeEl: HTMLElement){
-        this.$tmpl = tml;
-        this.$attr = attr;
-        this.$nodeEl = nodeEl;
-        this.$data_refs = [tml.replace('{','').replace('}','').replace('state.','').trim()]
-        this.$render = this.$should_update && this.createRender();
-    }
-
-    updateTxt(state, memoValue?: any): any{
-        const v = memoValue ? memoValue : this.$render(state, state.i);
-        !this.$nodeEl.value ? this.$nodeEl.setAttribute(this.$attr, v) : this.$nodeEl.value = v;
-        return v;
-    }
-
-    createRender(){
-        return new Function("state", "i", "return " + this.$tmpl.replace('{','').replace('}','') )
-    }
-}
-
 class IDom {
     $tag: string;
-    $tmpl: string;
+    $tmpl: string | any;
     $node: HTMLElement | IText | any;
     $should_update?: boolean = false;
-    $data_refs = [];
+    $data_refs:string[] = [];
     $children: Array<IDom | IText> = [];
     $props: object = {};
     $evtprops: object;
-    $iter_templ?: IDom | any;
+    $iter_block?: boolean;
     $databind?: string[];
     $render?: Function;
 
-    constructor(ref:HTMLElement, should_update?: boolean){
-        this.init(ref, should_update);
+    constructor(ref:HTMLElement | string, should_update?: boolean){
+        this.$should_update = should_update;
+        ref && this.init(ref);
     }
-
+    createRender(){
+        return new Function("state", "i", "return " + this.$tmpl.replace('{','').replace('}','') )
+    }
     //Creates new reactive DOM node
-    init(ref:HTMLElement | string, should_update) {
+    init(ref:HTMLElement | any) {
         if(typeof ref === 'string' || ref.nodeType===3){
             this.$tag = 'IText';
-            this.$should_update = should_update;
             this.$node = typeof ref === 'string' ? document.createTextNode(ref) : ref;
-            this.$tmpl = typeof ref === 'string' ? ref : ref.wholeText;
-            this.$data_refs = [this.$tmpl.replace('{','').replace('}','').replace('state.','').trim()]
-            this.$render = should_update && new Function("state", "i", "return " + this.$tmpl.replace('{','').replace('}','') );
+            this.$tmpl = typeof ref === 'string' ? ref : ref.data;
+            this.$data_refs = this.$should_update && [this.$tmpl.replace('{','').replace('}','').trim()]
+            this.$render = this.$should_update && this.createRender();
             return;
         }
         this.$tag = ref.nodeName
@@ -60,8 +34,8 @@ class IDom {
         [...ref.attributes].forEach(atr=>{
             let attr_name = atr.name;
             if(atr.name === 'data-for'){ 
-                this.$iter_templ = true;
-                this.$props['data-for'] = atr.value.split(' in ')
+                this.$iter_block = true;
+                this.$props['datafor'] = atr.value.split(' in ')
                 return; 
             }
             if(atr.name.startsWith('on')){ 
@@ -83,29 +57,38 @@ class IDom {
             }
 
         });
-        //Assign children
-        ref.childNodes && toVdom([...ref.childNodes]).forEach((inode: IDom | IText )=>{
-            this.$children.push(inode);            
+
+        //convert children into IDom nodes
+        ref.childNodes && toVdom([...ref.childNodes]).forEach((inode: IDom )=>{
+            this.$children.push(inode);        
+            !this.$iter_block && this.$node.appendChild(inode.$node); 
         });
-        // @ts-ignore Append child nodes
-        this.$children.forEach((cn: IDom | IText )=> this.$node.appendChild(cn.$node))
+       
     }
-    updateTxt(state, memoValue?: any): any{
-        const v = memoValue ? memoValue : this.$render(state, state.i);
+
+    updateTxt(state, memoMap?: any): any{
+        const v = memoMap ? memoMap : this.$render(state, state.i);
         this.$node.data = v;
         return v;
-    }
-    appendChild(idom){
-        this.$node.appendChild(idom)
-    }
-    copy(){
-        return new IDom(this.$node.cloneNode(true), this.$should_update);
     }
     
 }
 class IText extends IDom {}
+class IProp extends IDom {
+    $attr: string;
 
-//Recursively iterates over original html dom nodes and converts them into reactive objects
+    constructor(tml:string, attr:string, nodeEl: HTMLElement){
+        super(tml, true)
+        this.$attr = attr;
+        this.$node = nodeEl;
+    }
+
+    updateTxt(state, memoMap?: any): any{
+        const v = memoMap ? memoMap : this.$render(state, state.i);
+        !this.$node.value ? this.$node.setAttribute(this.$attr, v) : this.$node.value = v;
+        return v;
+    }
+}
 //IT would be a huge performance boost to have these nodes prerendered.
 const toVdom = (htmlNodes: Array<ChildNode>) => {
     const convertNodes = (tmpl) => [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];
@@ -142,50 +125,48 @@ const partText = (str) => {
             }
         });
     return textNodes;
-
 };
 
+export default function Pico(obj){
+    let memoMap = {}, reative_keys = [];
+    const is_iter_block = obj.iter_block;
+    const reactive_texts = [];
+    const subscribers = [];
+    const root = obj.root || is_iter_block.$node;
+    const name = obj.name;
+    const state = !is_iter_block ? create_state(obj.state) : obj.state;
+    const _template = typeof obj.view === 'function' ? obj.view(obj.state) : obj.view;
+    const domtree = !is_iter_block && toVdom(_template);
+    const actions = obj.actions;
 
-function Component(obj){
-
-    const create_iterables = (idom: IDom, has_iter_for, replace_index)=>{
-        const is_iter_root = idom.$props && idom.$props['data-for'];
-        if(!is_iter_root && !has_iter_for ){return;}
-        const [ctx_name, state_key] = has_iter_for ? has_iter_for : idom.$props['data-for'];
-        const refObj = state[state_key];
-        const domtree_index = refObj? refObj.length - 1 : replace_index;
-        idom.$iter_templ = null;
-        const icomp = new Component({ //Makes Root iter node and its children
-            name: "iter_root_"+idom.$tag,
-            root: root,
-            state: {...state, [ctx_name]: (refObj && refObj[domtree_index]), i: domtree_index},
-            view: idom,
-            iter_tmpl: idom.$children[0].copy()
-        });
-        if(has_iter_for) domtree[0].$children.push(icomp); subscribers.push([state_key, icomp]);
-        if(!has_iter_for){ 
-            domtree[replace_index] = icomp; 
-        };        
-        return icomp;
+    const recieve = ( k:string, data: any) => {
+        state[k] = data[k];
+        console.log(state, 'Youve got mail 🌍💌');
+        if(is_iter_block){
+            iter_insert(data[k].length-1);
+        }
+    }
+    const send = ( data: any ) => {
+        console.log(data, 'Message sent!🎉')
     }
 
-    function createState(obj){
+    function create_state(obj){
         const handler = {
             get(data, key){
                 return key in data ? data[key] : null;
             },
             set(data, key, newvalue){
-                if(key in data && data[key] === newvalue){ return true;}
+                if(key in data && data[key] === newvalue){ return key;}
                 data[key] = newvalue;
-                ready && update(key);
-                return true;
+                update(key);
+                return key;
             }
         }
         return new Proxy(obj, handler)
     }
 
     //Dispatch event handlers on target dom nodes
-    function createEventListeners(evtType: string, evtHandler: string | Function, idom: IDom) {
+    function apply_events(evtType: string, evtHandler: string | Function, idom: IDom) {
         let eventHandler = typeof evtHandler === 'function' ? evtHandler : actions[evtHandler];
         if(!eventHandler){console.log('Unable to assign '+evtHandler); return null;}
         const Ihandler = async (event) => {
@@ -193,97 +174,96 @@ function Component(obj){
           }
         idom.$node.addEventListener(evtType,Ihandler);
     }
-
     //Update reactive frags from any qualifying dom node
     const collate_reactives = (n) => {
-        n.$should_update ? reactive_texts.push([n.$tmpl, n]) : n.$children && n.$children.forEach(dc=>collate_reactives(dc))
-        n.$props && Object.values(n.$props).forEach((pc:IProp)=>pc.$should_update&&reactive_texts.push([pc.$tmpl, pc]))
+        n.$should_update ? reactive_texts.push([n.$tmpl, n]) : n.$children && n.$children.forEach(dc=>collate_reactives(dc));
+        n.$props && Object.values(n.$props).forEach((pc:IProp)=>pc.$should_update&&reactive_texts.push([pc.$tmpl, pc]));
     }
-
     //Initialize event handlers on dom nodes
     const delegate_events = (idom: IDom) => {
         if(idom.$evtprops){
             for(const k in idom.$evtprops){
                 const event_name = idom.$evtprops[k]
-                createEventListeners(k, event_name, idom)
+                apply_events(k, event_name, idom)
             }
         }else if (idom.$children) {
             // @ts-ignore
             idom.$children.forEach(ichld => ichld.$type==='IDom' && delegate_events(ichld))
         }
     }
-
-    //Automatic event handlers for nodes with bind props
+    //Automatic event handlers for input nodes with bind props
     const data_bind_inputs = (node: IDom) => {
         if(!node.$databind){return;}
         const [prop_name, state_attr] = node.$databind;
-        createEventListeners('input', (gstate)=>{
-            // @ts-ignore
-            gstate[state_attr] = node.$node.value;
+        apply_events('input', (gstate)=>{
+            gstate[state_attr] = node.$node[prop_name||'value'];
         }, node);
     }
-
-    const mount = (domtree) => {
-        domtree.forEach((idom: IDom, i)=>{
-            if(Array.isArray(idom)){ mount(idom); return;}
-            if(idom.$iter_templ){create_iterables(idom, null, i); return;}
-            root.appendChild(idom.$node ? idom.$node : idom);
+    //Mount Domtree to root node
+    const mount = (root_node?: HTMLElement) => {
+        domtree && domtree.forEach((idom: IDom, i)=>{
+            if(idom.$iter_block){ create_block(idom, i); return; }
+            root_node && root_node.appendChild(idom.$node);
+        });
+    }
+    //Hydrate domtree events, reactivity, and binders
+    const hydrate = (node_tree?: IDom[]) => {
+        node_tree.forEach((idom: IDom, i)=>{
             data_bind_inputs(idom);
             delegate_events(idom);
             collate_reactives(idom);
-        })
-        if(!ready && iter_tmpl){
-            const iter_root: IDom = domtree[0];
-            const iter_tree = iter_root.$children;
-            root = iter_root
-            domtree = iter_tree
-        }
-        ready = true;       
+        });
     } 
-    
+    //Updates all reactive fragments
     function update(key?: string) {
-        if(!ready){return}
         reactive_texts.forEach(ilist => {
             const [tmpl, itxt] = ilist;
-            if(key && tmpl.indexOf(key) === -1){return;} //TODO: Lets use the data_ref attributes to fine tune the guard
-            memoValue[tmpl] = itxt.updateTxt(state, memoValue[tmpl]);
+            if( key && tmpl.indexOf(key) === -1 ){return;} //TODO: Lets use the data_ref attributes to fine tune the guard
+            console.log(key, itxt.$data_refs)
+            memoMap[tmpl] = itxt.updateTxt(state, memoMap[tmpl]);
         })
-        subscribers.forEach(([k, isub])=> k===key && isub.recieve(key, state)) //returns updated state back to caller 
-        memoValue = {};
+        key && subscribers.forEach(([k, isub])=> k===key && isub.recieve(key, state)) //returns updated state back to caller 
+        memoMap = {};
     }
-    
-    let ready = false, memoValue = {}, root = obj.root;
-    const name = obj.name;
-    const state = createState(obj.state);
-    const template = typeof obj.view === 'function' ? obj.view(obj.state) : obj.view;
-    const reactive_texts = [];
-    const subscribers = [];
-    const domtree = !template.$tag ? toVdom(template) : [template];
-    const actions = obj.actions;
-    let iter_tmpl = obj.iter_tmpl;
 
-    const recieve = ( k:string, data: any ) => {
-        state[k] = data[k];
-        if(iter_tmpl){
-            create_iterables(iter_tmpl.copy(), root.$props['data-for'], null)
-        }
-        console.log(state, 'Youve got mail 🌍💌')
+    // Block nodes are Loops and Conditional that share context with root
+    const create_block = (idom: IDom, replace_index)=>{
+        const state_key = idom.$props['datafor'][1];
+        const icomp = new Pico({ //Makes Root iter node and its children
+            name: "iter_block",
+            iter_block: idom,
+            state: {[state_key]: state[state_key]},
+        });
+        root.appendChild(icomp.$.root);
+        domtree[replace_index] = icomp;
+        subscribers.push([state_key, icomp]);
+        return icomp;
     }
-    const send = ( data: any ) => {
-        console.log(data, 'Message sent!🎉')
-    }
+
     Object.defineProperty(this, 'send', {
         get(){ return send}
     })
     Object.defineProperty(this, 'recieve', {
         get(){ return recieve}
     })
-    Object.defineProperty(this, 'debug', {
-        get(){ return {name: name, domtree: domtree, state: state, re_txts: reactive_texts}}
+    Object.defineProperty(this, '$', {
+        get(){ return {subs: subscribers, name: name, children: domtree, root: root, state: state, re_txts: reactive_texts, reative_keys: reative_keys}}
     })
+    
+    const iter_insert = (cursor?: number) =>{
+        const [ctx_name, state_key] = is_iter_block.$props['datafor'];
+        const refIterble = state[state_key];
+        for (let index = cursor || 0; index < refIterble.length; index++) {
+            state[ctx_name] = refIterble[index];
+            state['i'] = index;
+            hydrate(is_iter_block.$children)
+            update('')//force all frag updates
+            is_iter_block.$children.forEach(cn=>root.appendChild(cn.$node.cloneNode(true)));
+        }
+    }
 
-    mount(domtree);
-    update();
+    if(!is_iter_block) {mount(root); hydrate(domtree); update();}else{
+        iter_insert();
+    }
+    
 }
-const Pico = Component
-export default Pico;

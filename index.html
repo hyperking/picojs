@@ -3,10 +3,10 @@
 
 <head>
     <title>Pico JS</title>
-    <script src="./build/picojs.umd.js.gz"></script>
-    <!-- <script src="./src/lib.ts" type="module"></script> -->
+    <!-- <script src="./build/picojs.umd.js"></script> -->
     <script type="module">
-        window.app = Pico!== undefined && new Pico({
+        import Pico from "./src/lib";
+        window.app = new Pico({
             name: "demo",
             root: document.getElementById('app'),
             actions: {
@@ -29,7 +29,7 @@
             state: {
                 count: 0,
                 items: ["one","two","three"],
-                todos: ["Uninstall ReactJS"],
+                todos: ["performance","pace"],
                 todo: '',
                 mouse: {x: 0, y: 0}
             },
@@ -62,7 +62,7 @@
             background: chartreuse;
             color: #054205;
         }
-
+        .even{background-color: aqua; color: blue;}
         .red {
             color: red;
         }
@@ -76,7 +76,7 @@
             color: white;
         }
     </style>
-    <h1>Basic sandbox demo</h1>
+    <h1>Pico JS Sandbox</h1>
     <div id="app"></div>
 </body>
 
