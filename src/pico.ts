@@ -16,7 +16,7 @@ class IDom {
         ref && this.init(ref);
     }
     createRender(){
-        return new Function("state", "i", "return " + this.$tmpl.replace('{','').replace('}','') )
+        return new Function("state", "i", "return " + this.$tmpl.replace(/{/g,'').replace(/}/g,'') );
     }
     //Creates new reactive DOM node
     init(ref:HTMLElement | any) {
@@ -130,7 +130,7 @@ const partText = (str) => {
 export default function Pico(obj){
     let memoMap = {}, reative_keys = [];
     const is_iter_block = obj.iter_block;
-    const reactive_texts = [];
+    const reactive_frags = [];
     const subscribers = [];
     const root = obj.root || is_iter_block.$node;
     const name = obj.name;
@@ -176,8 +176,8 @@ export default function Pico(obj){
     }
     //Update reactive frags from any qualifying dom node
     const collate_reactives = (n) => {
-        n.$should_update ? reactive_texts.push([n.$tmpl, n]) : n.$children && n.$children.forEach(dc=>collate_reactives(dc));
-        n.$props && Object.values(n.$props).forEach((pc:IProp)=>pc.$should_update&&reactive_texts.push([pc.$tmpl, pc]));
+        n.$should_update ? reactive_frags.push([n.$tmpl, n]) : n.$children && n.$children.forEach(dc=>collate_reactives(dc));
+        n.$props && Object.values(n.$props).forEach((pc:IProp)=>pc.$should_update&&reactive_frags.push([pc.$tmpl, pc]));
     }
     //Initialize event handlers on dom nodes
     const delegate_events = (idom: IDom) => {
@@ -216,7 +216,7 @@ export default function Pico(obj){
     } 
     //Updates all reactive fragments
     function update(key?: string) {
-        reactive_texts.forEach(ilist => {
+        reactive_frags.forEach(ilist => {
             const [tmpl, itxt] = ilist;
             if( key && tmpl.indexOf(key) === -1 ){return;} //TODO: Lets use the data_ref attributes to fine tune the guard
             console.log(key, itxt.$data_refs)
@@ -247,7 +247,7 @@ export default function Pico(obj){
         get(){ return recieve}
     })
     Object.defineProperty(this, '$', {
-        get(){ return {subs: subscribers, name: name, children: domtree, root: root, state: state, re_txts: reactive_texts, reative_keys: reative_keys}}
+        get(){ return {subs: subscribers, name: name, children: domtree, root: root, state: state, re_txts: reactive_frags, reative_keys: reative_keys}}
     })
     
     const iter_insert = (cursor?: number) =>{

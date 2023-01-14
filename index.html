@@ -35,7 +35,7 @@
             },
             view: (state) => { 
                 return `
-                <div onmousemove="handleMousemove" id="love" class="alert this that" data-foo="bar">
+                <div onmousemove="handleMousemove" style="'background-color: rgb('+{58 * state.mouse.x/100}+' '+{state.mouse.x}+' '+{state.mouse.y}+');'" id="love" class="alert this that" data-foo="bar">
                 You have clicked {state.count} times!!! <span>x:{state.mouse.x} y: {state.mouse.y}<span>
                 <h1 class="{state.count > 3 ? 'red' : 'blue'}">Count: {state.count}</h1>
                 </div>
