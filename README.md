@@ -2,7 +2,7 @@
 
 A micro reactive runtime library for building fine-grained reactive frontend user interfaces for the web.
 
-`bundle size: 4.62kb / gzip: 2kb`
+`bundle size: 4.29kb / gzip: 1.88kb`
 
 ```js
 const app = new Pico({
