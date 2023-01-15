@@ -9,6 +9,16 @@
         window.app = new Pico({
             name: "demo",
             root: document.getElementById('app'),
+            beforemount: (state)=>{
+                const getTodos = async ()=>{
+                    return await fetch("/mock.json")
+                    .then(res=>res.json());
+                }
+                getTodos().then(j=>{
+                    console.log(j)
+                    state.todos = [...state.todos, ...j.data];
+                })
+            },
             actions: {
                 increment: (state) => {
                     state.count += 1;
@@ -17,7 +27,7 @@
                     state.count -= 1;
                 },
                 addtodos( state ){ 
-                    if(!state.todo){return;}
+                    if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
                     state.todos = [...state.todos, state.todo]
                     state.todo = '';
                 },
@@ -29,12 +39,31 @@
             state: {
                 count: 0,
                 items: ["one","two","three"],
-                todos: ["performance","pace"],
+                todos: ["pico","means very small"],
                 todo: '',
                 mouse: {x: 0, y: 0}
             },
             view: (state) => { 
                 return `
+                <style>
+                    .alert {
+                        padding: 1em;
+                        background: chartreuse;
+                        color: #054205;
+                    }
+                    .even{background-color: aqua; color: blue;}
+                    .strike{text-decoration: line-through;}
+                    .red {
+                        color: red;
+                    }
+                    .blue {
+                        color: blue;
+                    }
+                    .danger {
+                        background: red;
+                        color: white;
+                    }
+                </style>
                 <div onmousemove="handleMousemove" style="'background-color: rgb('+{58 * state.mouse.x/100}+' '+{state.mouse.x}+' '+{state.mouse.y}+');'" id="love" class="alert this that" data-foo="bar">
                 You have clicked {state.count} times!!! <span>x:{state.mouse.x} y: {state.mouse.y}<span>
                 <h1 class="{state.count > 3 ? 'red' : 'blue'}">Count: {state.count}</h1>
@@ -42,13 +71,14 @@
                 <ul class="static-list">
                 ${state.items.map(item => `<li>${item}</li>`).join("")}
                 </ul>
+                <h2>Todos: {state.todos.length}</h2>
                 <ul class="dyn-list" data-for="thing in todos">
-                    <li data-when="todos" class="{i % 2===0 ? 'even': 'odd'}">{state.thing}: {i % 2===0 ? 'yay':'nay'}</li>
+                    <li data-when="todos" class="{(i % 2===0 ? 'even': 'odd') + (thing==='foo' ? ' strike':'')}">{thing}: {i % 2===0 ? 'yay':'nay'}</li>
                     ---
                 </ul>
                 <button onclick="increment">Count +</button>
                 <button onclick="decrement">Count -</button><br/>
-                <input type="text" data-bind:value="todo" /><br/>{state.todo}:{state.count}
+                <input type="text" data-bind:value="todo" onkeypress="addtodos"/><br/>{state.todo}:{state.count}
                 <button onclick="addtodos">Add todos</button>`
             }
         })
@@ -56,26 +86,6 @@
 </head>
 
 <body>
-    <style>
-        .alert {
-            padding: 1em;
-            background: chartreuse;
-            color: #054205;
-        }
-        .even{background-color: aqua; color: blue;}
-        .red {
-            color: red;
-        }
-
-        .blue {
-            color: blue;
-        }
-
-        .danger {
-            background: red;
-            color: white;
-        }
-    </style>
     <h1>Pico JS Sandbox</h1>
     <div id="app"></div>
 </body>

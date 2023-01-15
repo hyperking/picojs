@@ -15,17 +15,24 @@ class IDom {
         this.$should_update = should_update;
         ref && this.init(ref);
     }
-    createRender(){
-        return new Function("state", "i", "return " + this.$tmpl.replace(/{/g,'').replace(/}/g,'') );
+    createRender(iter_ctx?: string){
+        this.$render = new Function("state", "i", iter_ctx, "return " + this.$tmpl.replace(/{/g,'').replace(/}/g,'') );
     }
+
+    updateTxt(state, memoMap?: any): any{
+        const v = memoMap ? memoMap : this.$render(state, state.i, state.iter_item);
+        this.$node.data = v;
+        return v;
+    }
+
     //Creates new reactive DOM node
     init(ref:HTMLElement | any) {
         if(typeof ref === 'string' || ref.nodeType===3){
-            this.$tag = 'IText';
-            this.$node = typeof ref === 'string' ? document.createTextNode(ref) : ref;
+            this.$tag = ref.nodeType ? 'IText' : 'IProp';
             this.$tmpl = typeof ref === 'string' ? ref : ref.data;
-            this.$data_refs = this.$should_update && [this.$tmpl.replace('{','').replace('}','').trim()]
-            this.$render = this.$should_update && this.createRender();
+            this.$node = typeof ref === 'string' ? document.createTextNode(ref) : ref;
+            this.$data_refs = this.$should_update && [this.$tmpl.replace(/{/g,'').replace(/}/g,'').trim()]
+            this.$should_update && this.createRender();
             return;
         }
         this.$tag = ref.nodeName
@@ -49,27 +56,19 @@ class IDom {
                 attr_name = prop_name;
                 atr.value = '{state.'+state_attr+'}'                
             }
-            // @ts-ignore
             const propv = this.$databind || atr.value.includes('{') ? new IProp(atr.value, attr_name, this.$node) : atr.value;
             if(!this.$props[attr_name]) this.$props[attr_name] = propv; 
-            if(typeof propv === 'string'){ // @ts-ignore
+            if(typeof propv === 'string'){
                 this.$node.setAttribute(attr_name, atr.value);
             }
-
         });
 
         //convert children into IDom nodes
-        ref.childNodes && toVdom([...ref.childNodes]).forEach((inode: IDom )=>{
+        ref.childNodes && toVdom([...ref.childNodes])[0].forEach((inode: IDom )=>{
             this.$children.push(inode);        
             !this.$iter_block && this.$node.appendChild(inode.$node); 
         });
        
-    }
-
-    updateTxt(state, memoMap?: any): any{
-        const v = memoMap ? memoMap : this.$render(state, state.i);
-        this.$node.data = v;
-        return v;
     }
     
 }
@@ -84,7 +83,7 @@ class IProp extends IDom {
     }
 
     updateTxt(state, memoMap?: any): any{
-        const v = memoMap ? memoMap : this.$render(state, state.i);
+        const v = memoMap ? memoMap : this.$render(state, state.i, state.iter_item);
         !this.$node.value ? this.$node.setAttribute(this.$attr, v) : this.$node.value = v;
         return v;
     }
@@ -94,12 +93,14 @@ const toVdom = (htmlNodes: Array<ChildNode>) => {
     const convertNodes = (tmpl) => [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];
     const nodeList = typeof htmlNodes === 'string' ? convertNodes(htmlNodes) : htmlNodes;
     const res = [];
+    let style;
     nodeList.forEach((node: any)=>{
+        if(node.nodeName==='STYLE'){style = node; return;}
         if(!node || node.data && node.data.trim()===""){return}
         const d = node.nodeType===3 ? partText(node.data) : new IDom(node);
         if(Array.isArray(d)){d.forEach(inode=> res.push(inode))}else{ res.push(d) }
-    })    
-    return res;
+    })  
+    return [res, style];
 };
 
 //Converts template literals into IText object. returns a list of Text fragments
@@ -136,14 +137,14 @@ export default function Pico(obj){
     const name = obj.name;
     const state = !is_iter_block ? create_state(obj.state) : obj.state;
     const _template = typeof obj.view === 'function' ? obj.view(obj.state) : obj.view;
-    const domtree = !is_iter_block && toVdom(_template);
+    const [domtree, styletree] = !is_iter_block ? toVdom(_template) : [];
     const actions = obj.actions;
-
     const recieve = ( k:string, data: any) => {
+        const cursor = Array.isArray(data[k]) && state[k].length;
         state[k] = data[k];
         console.log(state, 'Youve got mail 🌍💌');
         if(is_iter_block){
-            iter_insert(data[k].length-1);
+            iter_insert(cursor);
         }
     }
     const send = ( data: any ) => {
@@ -175,9 +176,11 @@ export default function Pico(obj){
         idom.$node.addEventListener(evtType,Ihandler);
     }
     //Update reactive frags from any qualifying dom node
-    const collate_reactives = (n) => {
-        n.$should_update ? reactive_frags.push([n.$tmpl, n]) : n.$children && n.$children.forEach(dc=>collate_reactives(dc));
-        n.$props && Object.values(n.$props).forEach((pc:IProp)=>pc.$should_update&&reactive_frags.push([pc.$tmpl, pc]));
+    const collate_reactives = (n: IDom, ctx_name?: string) => {
+        n.$children && n.$children.forEach(dc=>collate_reactives(dc, ctx_name));
+        n.$props && Object.values(n.$props).forEach((pc:IProp)=>collate_reactives(pc, ctx_name));
+        n.$should_update && ctx_name && n.createRender(ctx_name); 
+        n.$should_update && reactive_frags.push([n.$tmpl, n]);
     }
     //Initialize event handlers on dom nodes
     const delegate_events = (idom: IDom) => {
@@ -186,10 +189,8 @@ export default function Pico(obj){
                 const event_name = idom.$evtprops[k]
                 apply_events(k, event_name, idom)
             }
-        }else if (idom.$children) {
-            // @ts-ignore
-            idom.$children.forEach(ichld => ichld.$type==='IDom' && delegate_events(ichld))
         }
+        idom.$children && idom.$children.forEach(ichld => ichld.$tag!=='IText' && delegate_events(ichld))   
     }
     //Automatic event handlers for input nodes with bind props
     const data_bind_inputs = (node: IDom) => {
@@ -205,27 +206,26 @@ export default function Pico(obj){
             if(idom.$iter_block){ create_block(idom, i); return; }
             root_node && root_node.appendChild(idom.$node);
         });
+        (styletree && root_node) && root_node.appendChild(styletree);
     }
     //Hydrate domtree events, reactivity, and binders
-    const hydrate = (node_tree?: IDom[]) => {
+    const hydrate = (node_tree?: IDom[], is_iter_item?: string) => {
         node_tree.forEach((idom: IDom, i)=>{
             data_bind_inputs(idom);
             delegate_events(idom);
-            collate_reactives(idom);
+            collate_reactives(idom, is_iter_item);
         });
     } 
     //Updates all reactive fragments
     function update(key?: string) {
-        reactive_frags.forEach(ilist => {
+        reactive_frags.forEach((ilist: [string, IDom]) => {
             const [tmpl, itxt] = ilist;
             if( key && tmpl.indexOf(key) === -1 ){return;} //TODO: Lets use the data_ref attributes to fine tune the guard
-            console.log(key, itxt.$data_refs)
             memoMap[tmpl] = itxt.updateTxt(state, memoMap[tmpl]);
         })
         key && subscribers.forEach(([k, isub])=> k===key && isub.recieve(key, state)) //returns updated state back to caller 
         memoMap = {};
     }
-
     // Block nodes are Loops and Conditional that share context with root
     const create_block = (idom: IDom, replace_index)=>{
         const state_key = idom.$props['datafor'][1];
@@ -251,19 +251,19 @@ export default function Pico(obj){
     })
     
     const iter_insert = (cursor?: number) =>{
-        const [ctx_name, state_key] = is_iter_block.$props['datafor'];
+        const [ctx_name, state_key] = is_iter_block.$props.datafor;
         const refIterble = state[state_key];
         for (let index = cursor || 0; index < refIterble.length; index++) {
             state[ctx_name] = refIterble[index];
+            state['iter_item'] = state[ctx_name];
             state['i'] = index;
-            hydrate(is_iter_block.$children)
-            update('')//force all frag updates
+            hydrate(is_iter_block.$children, ctx_name);
+            update('');//force all frag updates
             is_iter_block.$children.forEach(cn=>root.appendChild(cn.$node.cloneNode(true)));
         }
     }
-
+    typeof obj.beforemount === 'function' && obj.beforemount(state);
     if(!is_iter_block) {mount(root); hydrate(domtree); update();}else{
         iter_insert();
     }
-    
 }
