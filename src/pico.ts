@@ -24,13 +24,12 @@ class IDom {
         this.$node.data = v;
         return v;
     }
-
     //Creates new reactive DOM node
     init(ref:HTMLElement | any) {
         if(typeof ref === 'string' || ref.nodeType===3){
             this.$tag = ref.nodeType ? 'IText' : 'IProp';
             this.$tmpl = typeof ref === 'string' ? ref : ref.data;
-            this.$node = typeof ref === 'string' ? document.createTextNode(ref) : ref;
+            this.$node = (typeof ref === 'string') ? document.createTextNode(ref) : this.$tag==='IText' && ref;
             this.$data_refs = this.$should_update && [this.$tmpl.replace(/{/g,'').replace(/}/g,'').trim()]
             this.$should_update && this.createRender();
             return;
@@ -62,15 +61,12 @@ class IDom {
                 this.$node.setAttribute(attr_name, atr.value);
             }
         });
-
         //convert children into IDom nodes
         ref.childNodes && toVdom([...ref.childNodes])[0].forEach((inode: IDom )=>{
             this.$children.push(inode);        
             !this.$iter_block && this.$node.appendChild(inode.$node); 
         });
-       
     }
-    
 }
 class IText extends IDom {}
 class IProp extends IDom {
@@ -78,8 +74,8 @@ class IProp extends IDom {
 
     constructor(tml:string, attr:string, nodeEl: HTMLElement){
         super(tml, true)
-        this.$attr = attr;
         this.$node = nodeEl;
+        this.$attr = attr;
     }
 
     updateTxt(state, memoMap?: any): any{
@@ -102,7 +98,6 @@ const toVdom = (htmlNodes: Array<ChildNode>) => {
     })  
     return [res, style];
 };
-
 //Converts template literals into IText object. returns a list of Text fragments
 const partText = (str) => {
     function useRegex(input) {
@@ -147,10 +142,9 @@ export default function Pico(obj){
             iter_insert(cursor);
         }
     }
-    const send = ( data: any ) => {
-        console.log(data, 'Message sent!🎉')
+    const send = ( key: any ) => {
+        subscribers.forEach(([k, isub])=> {if(k===key) {isub.recieve(key, state);console.log(key,k, 'Message sent!🎉');}}) 
     }
-
     function create_state(obj){
         const handler = {
             get(data, key){
@@ -201,7 +195,7 @@ export default function Pico(obj){
         }, node);
     }
     //Mount Domtree to root node
-    const mount = (root_node?: HTMLElement) => {
+    const mount_tree = (root_node?: HTMLElement) => {
         domtree && domtree.forEach((idom: IDom, i)=>{
             if(idom.$iter_block){ create_block(idom, i); return; }
             root_node && root_node.appendChild(idom.$node);
@@ -223,7 +217,7 @@ export default function Pico(obj){
             if( key && tmpl.indexOf(key) === -1 ){return;} //TODO: Lets use the data_ref attributes to fine tune the guard
             memoMap[tmpl] = itxt.updateTxt(state, memoMap[tmpl]);
         })
-        key && subscribers.forEach(([k, isub])=> k===key && isub.recieve(key, state)) //returns updated state back to caller 
+        key && send(key);//returns updated state back to caller 
         memoMap = {};
     }
     // Block nodes are Loops and Conditional that share context with root
@@ -262,8 +256,20 @@ export default function Pico(obj){
             is_iter_block.$children.forEach(cn=>root.appendChild(cn.$node.cloneNode(true)));
         }
     }
-    typeof obj.beforemount === 'function' && obj.beforemount(state);
-    if(!is_iter_block) {mount(root); hydrate(domtree); update();}else{
-        iter_insert();
+    const mount = ()=>{
+        typeof obj.beforemount === 'function' && obj.beforemount(state);
+        if(!is_iter_block) {mount_tree(root); hydrate(domtree); update();}else{ iter_insert(); }
+    }
+    if(obj.resources){
+        const get_resource = async (endpoint)=>await fetch(endpoint).then(res=>res.json());
+        const promise_pool = Object.keys(obj.resources).map((endpoint)=>get_resource(endpoint) );
+        Promise.all(promise_pool).then(allres => {
+            Object.values(obj.resources).forEach((callback: Function,i)=>{
+                callback(allres[i], state)
+            })
+            mount();
+        });
+    }else{
+        mount();
     }
 }

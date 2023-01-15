@@ -9,15 +9,11 @@
         window.app = new Pico({
             name: "demo",
             root: document.getElementById('app'),
+            resources: {
+                "mock.json": (res, state)=> { state.todos = [...state.todos, ...res.data]; console.log(res); }
+            },
             beforemount: (state)=>{
-                const getTodos = async ()=>{
-                    return await fetch("/mock.json")
-                    .then(res=>res.json());
-                }
-                getTodos().then(j=>{
-                    console.log(j)
-                    state.todos = [...state.todos, ...j.data];
-                })
+                console.log('before we mount our nodes...')
             },
             actions: {
                 increment: (state) => {
