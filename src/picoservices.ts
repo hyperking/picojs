@@ -1,13 +1,14 @@
 import Pico from "@src/pico";
 export default function PicoServices (options?: any){
-    const domain = options['@domain'] || {};
+    const domain = options['@domain'] || '';
     const headers = options['@headerMap'] || {};
     const mocks = options['@mocks'] || {};
     const oninit = options['@call_oninit'];
     const endpoints = {};
     let app = options['@app'] || {};
     const get_opts = (endpoint) => headers[endpoint] || null;
-    const get_resource = async (endpoint)=>await fetch(endpoint, get_opts(endpoint)).then(res=>res.json());
+    const get_resource = async (endpoint)=>await fetch(`${domain}${endpoint}`, get_opts(endpoint)).then(res=>res.json());
+    
     this.__proto__.resolve = (init_endpoints?: string[]) => {
         const promise_pool = Object.keys(endpoints).filter(ep=>init_endpoints.indexOf(ep)>-1).map((endpoint)=>get_resource(endpoint) );
         Promise.all(promise_pool).then(allres => {
@@ -29,6 +30,4 @@ export default function PicoServices (options?: any){
         this.add(route_name, options[route_name]);
     })
     this.resolve(oninit);
- 
-
 }
