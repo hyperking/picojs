@@ -6,10 +6,11 @@
     <!-- <script src="./build/picojs.umd.js"></script> -->
     <script type="module">
         //import Pico from "./src/pico";
-        import PicoService from "./src/picoservices/picoservices";
+        import PicoService from "./src/picoservices";
         window.app = new PicoService({
             "@endpoint":"https://localhost:3000",
             "@state":{todos: ["pico","means very small"]},
+            "@call_oninit":["/api/todos"],
             "/api/todos": (res, state)=> { state.todos = [...state.todos, ...res.data];},
             "@app":{
                 name: "PicoJs Service demo",
