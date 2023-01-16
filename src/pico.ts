@@ -3,7 +3,7 @@ class IDom {
     $tmpl: string | any;
     $node: HTMLElement | IText | any;
     $should_update?: boolean = false;
-    $data_refs:string[] = [];
+    // $data_refs:string[] = [];
     $children: Array<IDom | IText> = [];
     $props: object = {};
     $evtprops: object;
@@ -30,7 +30,7 @@ class IDom {
             this.$tag = ref.nodeType ? 'IText' : 'IProp';
             this.$tmpl = typeof ref === 'string' ? ref : ref.data;
             this.$node = (typeof ref === 'string') ? document.createTextNode(ref) : this.$tag==='IText' && ref;
-            this.$data_refs = this.$should_update && [this.$tmpl.replace(/{/g,'').replace(/}/g,'').trim()]
+            // this.$data_refs = this.$should_update && [this.$tmpl.replace(/{/g,'').replace(/}/g,'').trim()]
             this.$should_update && this.createRender();
             return;
         }
@@ -260,16 +260,5 @@ export default function Pico(obj){
         typeof obj.beforemount === 'function' && obj.beforemount(state);
         if(!is_iter_block) {mount_tree(root); hydrate(domtree); update();}else{ iter_insert(); }
     }
-    if(obj.resources){
-        const get_resource = async (endpoint)=>await fetch(endpoint).then(res=>res.json());
-        const promise_pool = Object.keys(obj.resources).map((endpoint)=>get_resource(endpoint) );
-        Promise.all(promise_pool).then(allres => {
-            Object.values(obj.resources).forEach((callback: Function,i)=>{
-                callback(allres[i], state)
-            })
-            mount();
-        });
-    }else{
-        mount();
-    }
+    mount();
 }

@@ -4,7 +4,9 @@ A micro reactive runtime library for building fine-grained reactive frontend use
 
 `bundle size: 4.29kb / gzip: 2kb`
 
+**App example**
 ```js
+import Pico from "pico";
 const app = new Pico({
     name:"myApp", 
     root: document.getElementById('app'),
@@ -13,6 +15,28 @@ const app = new Pico({
     });
 
 // Output: <div id="app"><h1>Hello World</h1></div>
+```
+
+**Preloading data from external resources**
+Its a good practice to async await data from services before hydrating the UI to avoid loading spinners.
+
+The example below will query each endpoints, save the data into state, then mount the pico app.
+```js
+import PicoServices from "pico/picoservices/picoservices";
+const app = new PicoServices({
+                "@app":{name:"myApp",
+                root: document.getElementById('app'),
+                state: {todos: []},
+                view:()=>`<ul class="todo-list">
+                ${state.todos.map(item => `<li>${item}</li>`).join("")}
+                </ul>`
+                },
+                "@endpoint":"https://localhost:3000",
+                "@headers": {"/save_todo": {method:'POST', bearerToken:"picoUserPublicAuthToken"}},
+                "/todos": (res, state)=> { state.todos = [...state.todos, ...res.data];},
+                "/save_todo": (res, state)=> { state.todos = [...state.todos, ...res.data];
+                },
+            })
 ```
 
 **Fully supports:**
