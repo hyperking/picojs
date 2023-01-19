@@ -4,85 +4,87 @@
 <head>
     <title>Pico JS</title>
     <!-- <script src="./build/picojs.umd.js"></script> -->
-    <script type="module">
-        //import Pico from "./src/pico";
-        import PicoService from "./src/picoservices";
-        window.app = new PicoService({
-            "@endpoint":"https://localhost:3000",
-            "@state":{todos: ["pico","means very small"]},
-            "@call_oninit":["/api/todos"],
-            "/api/todos": (res, state)=> { state.todos = [...state.todos, ...res.data];},
-            "@app":{
-                name: "PicoJs Service demo",
-                root: document.getElementById('app'),
-                beforemount: (state)=>{
-                    console.log('before we mount our nodes...')
-                },
-                actions: {
-                    increment: (state) => {
-                        state.count += 1;
-                    },
-                    decrement: (state) => {
-                        state.count -= 1;
-                    },
-                    addtodos( state ){ 
-                        if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
-                        state.todos = [...state.todos, state.todo]
-                        state.todo = '';
-                    },
-                    handleMousemove(state, event) {
-                        const m = {x: event.clientX,y: event.clientY};
-                        state.mouse = m;
-                    }
-                },
-                state: {
-                    count: 0,
-                    items: ["one","two","three"],
-                    todos: ["pico","means very small"],
-                    todo: '',
-                    mouse: {x: 0, y: 0}
-                },
-                view: (state) => { 
-                    return `
-                    <style>
-                        .alert {
-                            padding: 1em;
-                            background: chartreuse;
-                            color: #054205;
-                        }
-                        .even{background-color: aqua; color: blue;}
-                        .strike{text-decoration: line-through;}
-                        .red {
-                            color: red;
-                        }
-                        .blue {
-                            color: blue;
-                        }
-                        .danger {
-                            background: red;
-                            color: white;
-                        }
-                    </style>
-                    <div onmousemove="handleMousemove" style="'background-color: rgb('+{58 * state.mouse.x/100}+' '+{state.mouse.x}+' '+{state.mouse.y}+');'" id="love" class="alert this that" data-foo="bar">
-                    You have clicked {state.count} times!!! <span>x:{state.mouse.x} y: {state.mouse.y}<span>
-                    <h1 class="{state.count > 3 ? 'red' : 'blue'}">Count: {state.count}</h1>
-                    </div>
-                    <ul class="static-list">
-                    ${state.items.map(item => `<li>${item}</li>`).join("")}
-                    </ul>
-                    <h2>Todos: {state.todos.length}</h2>
-                    <ol class="dyn-list" data-for="thing in todos">
-                        <li data-when="todos" class="{(i % 2===0 ? 'even': 'odd') + (thing==='foo' ? ' strike':'')}">{thing}: {i % 2===0 ? 'yay':'nay'}</li>
-                        ---
-                    </ol>
-                    <button onclick="increment">Count +</button>
-                    <button onclick="decrement">Count -</button><br/>
-                    <input type="text" data-bind:value="todo" onkeypress="addtodos"/><br/>{state.todo}:{state.count}
-                    <button onclick="addtodos">Add todos</button>`
-                }
-            }
-        })
-    </script>
+<script type="module">
+import Pico from "./src/pico";
+import PicoService from "./src/picoservices";
+window.appservice = new PicoService({
+    protocol: "http",
+    domain: "localhost:3000",
+    call_oninit: ["/api/todos"],
+    headerMap: {"/api/todos": {method: "GET"} },
+    endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
+}).loadApps([new Pico({
+    name: "PicoJs Service demo",
+    root: document.getElementById('app'),
+    receive(id, newdata, state){
+        console.log('do something', state, newdata)
+        state.todos = [...state.todos, ...newdata.todos]
+    },
+    beforemount: (state)=>{
+        console.log('before we mount our nodes...')
+    },
+    actions: {
+        increment: (state) => {
+            state.count += 1;
+        },
+        decrement: (state) => {
+            state.count -= 1;
+        },
+        addtodo( state ){ 
+            if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
+            state.todos = [...state.todos, state.todo]
+            state.todo = '';
+        },
+        handleMousemove(state, event) {
+            const m = {x: event.clientX,y: event.clientY};
+            state.mouse = m;
+        },
+        markdone(state){
+            console.log(event.target)
+        }
+    },
+    state: {
+        count: 0,
+        items: ["one","two","three"],
+        todos: ["pico","means very small"],
+        todo: '',
+        mouse: {x: 0, y: 0}
+    },
+    view: (state) => { 
+        return `
+        <style>
+            .red{color: red;}
+            .green{color: green;}
+            .strike{text-decoration: line-through}
+            .todolist{background: aliceblue; padding: 1rem;}
+            #app{margin: 0 auto; padding:2rem; max-width: 500px;}
+        </style>
+        this is only a test
+        <div class="todolist" onclick="foo"></div>
+        <ul class="dyn-list menu" data-for="thing in todos">
+            <li class="menu-item">
+                <label class="{'form-checkbox'+ (thing==='pico' ? ' strike':'')}" data-foo="{thing==='pico' ? 'checked':'unchecked'}">
+                    <input type="checkbox" value="{thing}" checked="{thing==='pico' ? 'checked':'unchecked'}">
+                    <i class="form-icon"></i> {thing} : {thing.length}
+                </label>
+            </li>
+            ---
+        </ul>
+        <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
+        <div class="form-group">
+            <label class="form-label">Name</label>
+            <input data-bind:value="state.todo" onkeypress="addtodo" class="form-input" type="text" placeholder="Press enter key to submit a todo"/>
+            <p class="form-input-hint"><strong>{state.todo} : {state.todo.length}</strong></p>
+        </div>
+        <div class="btn-group btn-group-block">
+            <button onclick="increment" class="btn btn-primary">+{state.count}</button>
+            <button class="btn">Fetch Todos</button>
+            <button onclick="decrement" class="btn">-</button>
+            </div>
+        `
+    }
+})]);
+</script>
 </head>
 
 <body>
