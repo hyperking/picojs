@@ -54,11 +54,17 @@
             prependTodos(state){
                 state.todos = [`foo ${state.likes}`, ...state.todos] //prepends to existing list
             },
-            markdone(state){
+            showMeter(state){
                 console.log(event.target)
+                state.showMeter = true;
             }
         },
         state: {
+            showMeter: false,
+            $:{
+                character: (state)=> (state.likes > 10) ? '/pokemon-gen8/shiny/blastoise.png' : 
+                (state.likes > 5)?'/pokemon-gen8/shiny/squirtle.png':'/items-outline/ball/great.png'
+            },
             likes: 0,
             items: ["one","two","three"],
             todos: ["pico","means very small"],
@@ -76,6 +82,7 @@
                 #app{margin: 0 auto; padding:2rem; max-width: 500px;}
             </style>
             this is only a test
+            <TestComponent></TestComponent>
             <!--<div class="todolist" onclick="foo">
             <ol class="dyn-list menu" data-for="thing in todos">
                 <li class="menu-item">
@@ -86,6 +93,9 @@
                 </li>
                 ---{i}
             </ol></div>-->
+            <div class="character">
+                <img class="img-responsive col-2" src="{'https://raw.githubusercontent.com/msikma/pokesprite/master'+state.character}" style="margin: 0 auto;"/>
+            </div>
             <table class="table table-striped table-hover">
                 <thead>
                   <tr>
@@ -114,6 +124,7 @@
             </div>
             <div class="btn-group btn-group-block">
                 <button onclick="increment" class="btn btn-primary">+Likes</button>
+                <button onclick="showMeter" class="btn btn-primary">Show Meter</button>
                 <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
             </div>
             `

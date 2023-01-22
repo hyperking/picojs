@@ -97,7 +97,6 @@ export default function Pico(obj: pico){
             this.iter_item = iter_name;
             this.state_key = iter_state_key;
             this.$state = {[iter_state_key]: state[iter_state_key], iter_item: null, i: 0};
-            // this.node.innerHTML = '';
             this.reconcileIterable();
             parent_root.appendChild(this.node);
             subscribers.push([this.state_key, this])
@@ -213,17 +212,26 @@ export default function Pico(obj: pico){
         key && send(key);
     }
     
-    function createState(obj){
+    function createState(stateObj){
+        const computes = []
+        Object.keys(stateObj.$).forEach(k=>{
+            computes.push([k, stateObj.$[k]])
+            stateObj[k] = stateObj.$[k](stateObj);
+        })
         const handler = {
-            get(data, key){ return key in data ? data[key] : null; },
+            get(data, key){ 
+                return key in data ? data[key] : null;
+                // return key in computes ? computes[key](state) : key in data ? data[key] : null; 
+            },
             set(data, key, newvalue){
                 if(key in data && data[key] === newvalue){ return key;}
                 data[key] = newvalue;
+                computes.forEach(([k, cfunc])=> state[k] = cfunc(state))
                 update(key);
                 return key;
             }
         }
-        return new Proxy(obj, handler);
+        return new Proxy(stateObj, handler);
     }
     
     function send( key: any ){
@@ -262,5 +270,5 @@ export default function Pico(obj: pico){
     console.log(domtree);
     styles.length > 0 && root.appendChild(...styles);
     update();
-    this.__proto__.$ = {send: send, receive: receive, rf: reactfrags, subs: blockfrags, name: domtree, actions: actions, root: root, state: state}
+    this.__proto__.$ = {send: send, receive: receive, rf: reactfrags, subs: blockfrags, domtree: domtree, actions: actions, root: root, state: state}
 }
