@@ -3,8 +3,124 @@
 
 <head>
     <title>Pico JS</title>
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-exp.min.css">
+<link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-icons.min.css">
     <!-- <script src="./build/picojs.umd.js"></script> -->
 <script type="module">
+    import Pico from "./src/pico";
+    import PicoService from "./src/picoservices";
+
+    window.app = new PicoService({
+        protocol: "http",
+        domain: "localhost:3000",
+        call_oninit: ["/api/todos"],
+        headerMap: {"/api/todos": {method: "GET"} },
+        endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
+    }).loadApps([
+    new Pico({
+        name: "PicoJs Service demo",
+        root: document.getElementById('app'),
+        receive(id, newdata, state){
+            state.todos = [...state.todos, ...newdata.todos ] //appends to existing list * recommended
+        },
+        beforemount: (state)=>{
+            console.log('before we mount our nodes...')
+        },
+        actions: {
+            increment: (state) => {
+                state.likes += 1;
+            },
+            decrement: (state) => {
+                state.likes -= 1;
+            },
+            addtodo( state ){ 
+                console.log('addtodo')
+                state.todo = event.target.value;
+                if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
+                state.todos = [...state.todos, state.todo]
+                state.todo = ''
+            },
+            handleMousemove(state, event) {
+                const m = {x: event.clientX,y: event.clientY};
+                state.mouse = m;
+            },
+            overRideTodos(state){
+                state.todos = [`foo ${state.likes}`]
+            },
+            appendTodos(state){
+                state.todos = [...state.todos, `foo ${state.likes}`] //appends to existing list * recommended
+            },
+            prependTodos(state){
+                state.todos = [`foo ${state.likes}`, ...state.todos] //prepends to existing list
+            },
+            markdone(state){
+                console.log(event.target)
+            }
+        },
+        state: {
+            likes: 0,
+            items: ["one","two","three"],
+            todos: ["pico","means very small"],
+            todo: '',
+            mouse: {x: 0, y: 0}
+        },
+        view: (state) => { 
+            return `
+            <style>
+                ol{list-style: decimal outside;}
+                .red{color: red;}
+                .green{color: green;}
+                .strike{text-decoration: line-through}
+                .todolist{background: aliceblue; padding: 1rem;}
+                #app{margin: 0 auto; padding:2rem; max-width: 500px;}
+            </style>
+            this is only a test
+            <!--<div class="todolist" onclick="foo">
+            <ol class="dyn-list menu" data-for="thing in todos">
+                <li class="menu-item">
+                    <label class="{'form-checkbox'+ (thing==='pico' ? ' strike':'')}" data-foo="{thing==='pico' ? 'checked':'unchecked'}">
+                        <input type="checkbox" value="{thing}" checked="{thing==='pico' ? 'checked':'unchecked'}">
+                        <i class="form-icon"></i> {thing} : {thing.length}
+                    </label>
+                </li>
+                ---{i}
+            </ol></div>-->
+            <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>index</th>
+                    <th>name</th>
+                  </tr>
+                </thead>
+                <tbody data-for="thing in todos">
+                  <tr>
+                    <td>{i}</td>
+                    <td>{thing}</td>
+                  </tr>
+                </tbody>
+              </table>
+            <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
+            <p>Likes: {state.likes}</p>
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input value="{state.todo}" onkeypress="addtodo" class="form-input" type="text" placeholder="Press enter key to submit a todo"/>
+                <p><strong>{state.todo} : {state.todo.length}</strong></p>
+            </div>
+            <div class="btn-group btn-group-block">
+                <button onclick="prependTodos" class="btn">Prepend Todos <span>{state.likes}</span></button>
+                <button onclick="appendTodos" class="btn">Append Todos <span>{state.likes}</span></button>
+                <button onclick="overRideTodos" class="btn">Override todo list <span>{state.likes}</span></button>
+            </div>
+            <div class="btn-group btn-group-block">
+                <button onclick="increment" class="btn btn-primary">+Likes</button>
+                <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
+            </div>
+            `
+        }})
+        ]);
+</script>
+<!-- <script type="module">
 import Pico from "./src/pico";
 import PicoService from "./src/picoservices";
 window.appservice = new PicoService({
@@ -17,7 +133,7 @@ window.appservice = new PicoService({
     name: "PicoJs Service demo",
     root: document.getElementById('app'),
     receive(id, newdata, state){
-        console.log('do something', state, newdata)
+        //console.log('do something', state, newdata)
         state.todos = [...state.todos, ...newdata.todos]
     },
     beforemount: (state)=>{
@@ -25,10 +141,10 @@ window.appservice = new PicoService({
     },
     actions: {
         increment: (state) => {
-            state.count += 1;
+            state.likes += 1;
         },
         decrement: (state) => {
-            state.count -= 1;
+            state.likes -= 1;
         },
         addtodo( state ){ 
             if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
@@ -77,19 +193,19 @@ window.appservice = new PicoService({
             <p class="form-input-hint"><strong>{state.todo} : {state.todo.length}</strong></p>
         </div>
         <div class="btn-group btn-group-block">
-            <button onclick="increment" class="btn btn-primary">+{state.count}</button>
+            <button onclick="increment" class="btn btn-primary">+{state.likes}</button>
             <button class="btn">Fetch Todos</button>
             <button onclick="decrement" class="btn">-</button>
             </div>
         `
     }
 })]);
-</script>
+</script> -->
 </head>
 
 <body>
-    <h1>Pico JS Sandbox</h1>
-    <div id="app"></div>
+    
+    <div id="app"><h1>Pico JS Sandbox</h1></div>
 </body>
 
 </html>

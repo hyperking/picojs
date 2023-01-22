@@ -8,7 +8,6 @@ export default function PicoServices (options?: any){
     const apps = [];
     const get_opts = (endpoint) => headers[endpoint] || null;
     const get_resource = async (endpoint)=>await fetch(`${protocol}://${domain}${endpoint}`, get_opts(endpoint)).then(res=>res.json());
-    const opt_endpoints = options.endpoints
     this.__proto__.resolve = (init_endpoints?: string[]) => {
         const promise_pool = Object.keys(endpoints).filter(ep=>init_endpoints.indexOf(ep)>-1).map((endpoint)=>get_resource(endpoint) );
         const state = {};
@@ -16,7 +15,7 @@ export default function PicoServices (options?: any){
             Object.values(endpoints).forEach((callback: Function,i)=>{
                 callback(allres[i], state);
             })
-            apps.map(app => app.receive('picoservices', state))
+            apps.map(app => app.$.receive('picoservices', state))
         });
     }
 
@@ -25,10 +24,18 @@ export default function PicoServices (options?: any){
         if (headers) headers[slug] = headers;
     }
 
-    this.__proto__.loadApps = (appList: any[]) => appList.forEach(app=>{apps.push(app)});
+    this.__proto__.loadApps = (appList: any[]) => {
+        appList.forEach(app=>{apps.push(app)});
+        return this.$;
+    }
+
     options.endpoints.forEach((route: any[])=>{
         const [route_slug, callback] = route;
         this.add(route_slug, callback);
     })
     this.resolve(oninit);
+    this.__proto__.$ = {
+        apps: apps,
+        endpoints: endpoints
+    }
 }

@@ -2,7 +2,7 @@
 
 A micro reactive runtime library for building fine-grained reactive frontend user interfaces for the web.
 
-`bundle size: 4.00kb / gzip: 1.84kb`
+`bundle size: 4.48kb / gzip: 1.92kb`
 
 **App example**
 ```js
