@@ -1,6 +1,7 @@
 {
   "name": "picojs",
   "version": "0.0.1",
+  "description": "A micro reactive runtime library for building fine-grained reactive frontend user interfaces for the web.",
   "scripts": {
     "dev": "vite",
     "build": "npm run buildjs",
