@@ -74,7 +74,7 @@ export default function Pico(obj: pico){
         node: HTMLElement | any;
         children: Array<any>;
         attrs: any;
-        constructor(node: HTMLElement|any, parent_node?: HTMLElement, iter_ctx?: string){
+        constructor(node: HTMLElement|any, iter_ctx?: string){
             this.node = document.createElement(node.nodeName);
             this.children = (node.childNodes.length > 0) && [...node.childNodes]
             .reduce((nl, cn)=>{
@@ -92,7 +92,7 @@ export default function Pico(obj: pico){
         $frags: any[];
         constructor(block_node: HTMLElement, parent_root: HTMLElement){
             const [iter_name, iter_state_key] = block_node.dataset.for.split(' in ');
-            super(block_node, parent_root, iter_name)
+            super(block_node, iter_name)
             this.$frags = [...blockfrags];
             this.iter_item = iter_name;
             this.state_key = iter_state_key;
@@ -109,8 +109,10 @@ export default function Pico(obj: pico){
         arrayStrategy(inputData?: any[]): Array<any> {
             const oldData = this.$state[this.state_key];
             const has_changed = oldData.length !== inputData.length;
-            const is_prepend = has_changed && oldData.toString() === inputData.slice((inputData.length - oldData.length)).toString();
-            const is_append = has_changed && oldData.toString() === inputData.slice(0,oldData.length).toString();
+            const is_prepend = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice((inputData.length - oldData.length)));
+            const is_append = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice(0,oldData.length));
+            // const is_prepend = has_changed && oldData.toString() === inputData.slice((inputData.length - oldData.length)).toString();
+            // const is_append = has_changed && oldData.toString() === inputData.slice(0,oldData.length).toString();
             const strategy = !is_prepend&&!is_append ? 'NEW' : is_append ? 'APPEND' : 'PREPEND';
             const curr = strategy==='NEW'? 0 : oldData.length;
             const itr = is_append ? inputData.slice(oldData.length, inputData.length) : 
@@ -158,7 +160,7 @@ export default function Pico(obj: pico){
     function processNode(cnode: HTMLElement| any, parent_node: HTMLElement, iter_ctx?: string){
         if(skipNode(cnode)){return;}
         const is_block_loop = cnode.dataset && 'for' in cnode.dataset;
-        const n = cnode.nodeName==='#text' ? new IFrag(cnode.textContent) : !is_block_loop && new INode(cnode, parent_node, iter_ctx);
+        const n = cnode.nodeName==='#text' ? new IFrag(cnode.textContent) : !is_block_loop && new INode(cnode, iter_ctx);
 
         if(cnode.nodeName==='#text'){
             const txtparts = partText(n.node.textContent);
@@ -221,7 +223,6 @@ export default function Pico(obj: pico){
         const handler = {
             get(data, key){ 
                 return key in data ? data[key] : null;
-                // return key in computes ? computes[key](state) : key in data ? data[key] : null; 
             },
             set(data, key, newvalue){
                 if(key in data && data[key] === newvalue){ return key;}

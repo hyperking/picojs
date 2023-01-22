@@ -1,3 +1,3 @@
 {
-    "data": ["We","Love","Performant","JS Libraries"]
+    "data": [{"name":"We"},{"name":"Love"},{"name":"Performant"},{"name":"JS Libraries"}]
 }

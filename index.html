@@ -38,7 +38,7 @@
                 console.log('addtodo')
                 state.todo = event.target.value;
                 if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
-                state.todos = [...state.todos, state.todo]
+                state.todos = [...state.todos, {name: state.todo}]
                 state.todo = ''
             },
             handleMousemove(state, event) {
@@ -46,28 +46,31 @@
                 state.mouse = m;
             },
             overRideTodos(state){
-                state.todos = [`foo ${state.likes}`]
+                state.todos = [{name: `foo ${state.todos.length}`}]
             },
             appendTodos(state){
-                state.todos = [...state.todos, `foo ${state.likes}`] //appends to existing list * recommended
+                state.todos = [...state.todos, {name: `foo ${state.todos.length}`}] //appends to existing list * recommended
             },
             prependTodos(state){
-                state.todos = [`foo ${state.likes}`, ...state.todos] //prepends to existing list
+                state.todos = [{name: `foo ${state.todos.length}`}, ...state.todos] //prepends to existing list
             },
             showMeter(state){
                 console.log(event.target)
-                state.showMeter = true;
+                state.showMeter = !state.showMeter;
             }
         },
         state: {
             showMeter: false,
             $:{
-                character: (state)=> (state.likes > 10) ? '/pokemon-gen8/shiny/blastoise.png' : 
-                (state.likes > 5)?'/pokemon-gen8/shiny/squirtle.png':'/items-outline/ball/great.png'
+                character: (state)=> 
+                (state.likes > 25) ? '/pokemon-gen8/regular/charizard-gmax.png' : 
+                (state.likes > 15) ? '/pokemon-gen8/regular/venusaur-gmax.png' : 
+                (state.likes > 10) ? '/pokemon-gen8/shiny/venusaur.png' : 
+                (state.likes > 5)?'/pokemon-gen7x/shiny/venusaur.png':'/items/evo-item/thunder-stone.png'
             },
             likes: 0,
             items: ["one","two","three"],
-            todos: ["pico","means very small"],
+            todos: [{name: "pico"},{name: "means very small"}],
             todo: '',
             mouse: {x: 0, y: 0}
         },
@@ -81,7 +84,7 @@
                 .todolist{background: aliceblue; padding: 1rem;}
                 #app{margin: 0 auto; padding:2rem; max-width: 500px;}
             </style>
-            this is only a test
+            fun, improving, exploring, and developing features
             <TestComponent></TestComponent>
             <!--<div class="todolist" onclick="foo">
             <ol class="dyn-list menu" data-for="thing in todos">
@@ -93,7 +96,7 @@
                 </li>
                 ---{i}
             </ol></div>-->
-            <div class="character">
+            <div class="character" data-when={!state.showMeter}>
                 <img class="img-responsive col-2" src="{'https://raw.githubusercontent.com/msikma/pokesprite/master'+state.character}" style="margin: 0 auto;"/>
             </div>
             <table class="table table-striped table-hover">
@@ -106,7 +109,7 @@
                 <tbody data-for="thing in todos">
                   <tr>
                     <td>{i}</td>
-                    <td>{thing}</td>
+                    <td>{thing.name}</td>
                   </tr>
                 </tbody>
               </table>
@@ -135,8 +138,7 @@
 </head>
 
 <body>
-    
-    <div id="app"><h1>Pico JS Sandbox</h1></div>
+    <div id="app"><h1>pico sandbox</h1></div>
 </body>
 
 </html>
