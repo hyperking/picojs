@@ -1,13 +1,13 @@
 **Services / Store**
 
-PicoService instance provides a way to agregate data from multiple sources before hydrating web application from the client side.
+KunaiService instance provides a way to agregate data from multiple sources before hydrating web application from the client side.
 
 The example below will query each endpoints, save the data into state, then mount the pico app instances.
 
 ```js
-import PicoServices from "pico/picoservices";
+import KunaiServices from "pico/kunaiservices";
 //setup service instance
-const app = new PicoServices({
+const app = new KunaiServices({
     call_oninit:["/api/todos"],
     domain:"https://localhost:3000",
     headerMap: {"/save_todo": {method:'POST', bearerToken:"picoUserPublicAuthToken"}},

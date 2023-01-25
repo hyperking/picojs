@@ -2,23 +2,23 @@
 <html>
 
 <head>
-    <title>Pico JS</title>
+    <title>kunaiJS</title>
     <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
     <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-exp.min.css">
 <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-icons.min.css">
-    <!-- <script src="./build/picojs.umd.js"></script> -->
+    <!-- <script src="./build/kunaijs.umd.js"></script> -->
 <script type="module">
-    import Pico from "./src/pico";
-    import PicoService from "./src/picoservices";
+    import Kunai from "./src/kunai";
+    import KunaiService from "./src/kunaiservices";
 
-    window.app = new PicoService({
+    window.app = new KunaiService({
         protocol: "http",
         domain: "localhost:3000",
         call_oninit: ["/api/todos"],
         headerMap: {"/api/todos": {method: "GET"} },
         endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
     }).loadApps([
-    new Pico({
+    new Kunai({
         name: "PicoJs Service demo",
         root: document.getElementById('app'),
         receive(id, newdata, state){
@@ -160,7 +160,7 @@
             <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
         </div>
     </template>
-    <div id="app"><h1>pico sandbox</h1></div>
+    <div id="app"><h1>Kunai dojo</h1></div>
 </body>
 
 </html>

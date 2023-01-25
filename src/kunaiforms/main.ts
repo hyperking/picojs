@@ -18,7 +18,7 @@ class ICtrl {
     this.label_for = [parnt? parnt.label : null, label].filter(s=>s!=null).join(".").toLowerCase().replace(' ','');
     this.type = this.getIType(value, parnt)
     this.value = this.type === 'fieldset' ? null : this.type === 'text' ? value : null;
-    this.inputs = ['fieldset','multiInput'].indexOf(this.type)>-1 ? PicoForm.fromJson(value, this) : null;
+    this.inputs = ['fieldset','multiInput'].indexOf(this.type)>-1 ? KunaiForm.fromJson(value, this) : null;
     // const base_prop_names = ['id', 'name', 'type', 'value', 'disabled', 'class', 'selected'];
     this.props = {name: this.label_for, id: this.label_for, class: null, ...props}
   }
@@ -33,9 +33,9 @@ class ICtrl {
   }
 }
 
-class PicoForm {
+class KunaiForm {
   type?: FormTypes = FormTypes.BASIC;
-  id?: string = "PicoForm-" + Math.random().toString(36).substring(7);
+  id?: string = "KunaiForm-" + Math.random().toString(36).substring(7);
   source: HTMLFormElement;
   validator: any = {
     required_fields: [],//Any name input prefixed with * will be placed here
@@ -156,4 +156,4 @@ class PicoForm {
     })
   }
 }
-export default PicoForm
+export default KunaiForm

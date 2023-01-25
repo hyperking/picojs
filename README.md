@@ -1,6 +1,6 @@
-# picoJS
+# Kunai JS
 
-A micro reactive runtime library for building fine-grained reactive frontend user interfaces for the web.
+A micro library for building fine-grained reactive frontend user interfaces on the web.
 
 `bundle size: 4.48kb / gzip: 1.92kb`
 

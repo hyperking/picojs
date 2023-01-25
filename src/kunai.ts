@@ -1,4 +1,4 @@
-type pico = {
+type kunai = {
     view: Function;
     state?: any; 
     actions?: any;
@@ -13,7 +13,7 @@ type loopctx = {
     loop?: any,
     inner?: loopctx
 }
-export default function Pico(obj: pico){
+export default function Kunai(obj: kunai){
     //Converts template literals into IText object. returns a list of Text fragments
     const partText = (str): IFrag[] => {
         function useRegex(input) {

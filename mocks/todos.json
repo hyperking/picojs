@@ -1,3 +1,24 @@
 {
-    "data": [{"name":"We"},{"name":"Love"},{"name":"Performant"},{"name":"JS Libraries"}]
+    "data": [
+        {
+            "done": false,
+            "id": 0,
+            "name": "We"
+        },
+        {
+            "done": false,
+            "id": 1,
+            "name": "Love"
+        },
+        {
+            "done": false,
+            "id": 2,
+            "name": "small + Performant"
+        },
+        {
+            "done": false,
+            "id": 3,
+            "name": "JS Libraries"
+        }
+    ]
 }
