@@ -7,6 +7,12 @@ type pico = {
     beforemount?: Function;
     root?: HTMLElement
 }
+type loopctx = {
+    iter_item: string,
+    iter_value?: any,
+    loop?: any,
+    inner?: loopctx
+}
 export default function Pico(obj: pico){
     //Converts template literals into IText object. returns a list of Text fragments
     const partText = (str): IFrag[] => {
@@ -44,26 +50,38 @@ export default function Pico(obj: pico){
             this.node = document.createTextNode(str);
         }
     
-        createRender(iter_ctx?: string){
-            this.$render = new Function("state", "i", iter_ctx, "return " + this.$tmpl.replace(/{/g,'').replace(/}/g,'') );
+        createRender(iloop?: loopctx){
+            const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'');
+            const outerctx = (iloop && iloop.inner) && iloop.inner.iter_item;
+            this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
         }
     
-        updateTxt(state, memoMap?: any): any{
-            const v = memoMap ? memoMap : this.$render(state, state.i, state.iter_item);
+        updateTxt(state, memoMap?: any, loopctx?: loopctx): any{
+            const innerctxv = (loopctx && loopctx.inner) && loopctx.inner.iter_value;
+            const innerctxl = (loopctx && loopctx.inner) && loopctx.inner.loop;
+            const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, innerctxv, innerctxl) : this.$render(state);
             this.node.textContent = v;
             return v;
         }
     }
     class IAttr extends IFrag{
         $attr: string;
-        constructor(str:string, attr:string, nodeEl: Attr){
+        constructor(str:string, attr:string, nodeEl: HTMLElement){
             super(str)
-            this.$tmpl = str;
+            this.$tmpl = partText(str).map(st=>{
+                if(st.$tmpl.includes("{")){
+                    return st.$tmpl.replace('{','').replace('}','')
+                } return `"${st.$tmpl}"`
+            }).join(' + ');
             this.node = document.createAttribute(attr);
             this.$attr = attr;
+            nodeEl.setAttributeNode(this.node); //sets an attr node type
         }
-        updateTxt(state, memoMap?: any): any{
-            const v = memoMap ? memoMap : this.$render(state, state.i, state.iter_item);
+        updateTxt(state, memoMap?: any, loopctx?: loopctx): any{
+            const innerctxv = (loopctx && loopctx.inner) && loopctx.inner.iter_value;
+            const innerctxl = (loopctx && loopctx.inner) && loopctx.inner.loop;
+            const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, innerctxv, innerctxl) : this.$render(state);
+
             this.node.value = v;
             const is_input = this.node.ownerElement && this.node.ownerElement.nodeName==='INPUT';
             if(is_input) { this.node.ownerElement[this.$attr] = v;}
@@ -73,8 +91,7 @@ export default function Pico(obj: pico){
     class INode {
         node: HTMLElement | any;
         children: Array<any>;
-        attrs: any;
-        constructor(node: HTMLElement|any, iter_ctx?: string){
+        constructor(node: HTMLElement|any, iter_ctx?: loopctx){
             this.node = document.createElement(node.nodeName);
             this.children = (node.childNodes.length > 0) && [...node.childNodes]
             .reduce((nl, cn)=>{
@@ -88,31 +105,32 @@ export default function Pico(obj: pico){
     class IBlock extends INode{
         iter_item: string;
         state_key: string;
-        $state: any;
+        $loop: loopctx;
         $frags: any[];
+        $state: any[];
         constructor(block_node: HTMLElement, parent_root: HTMLElement){
             const [iter_name, iter_state_key] = block_node.dataset.for.split(' in ');
-            super(block_node, iter_name)
+            // nested.push(iter_name);
+            super(block_node, {iter_item: iter_name})
             this.$frags = [...blockfrags];
             this.iter_item = iter_name;
             this.state_key = iter_state_key;
-            this.$state = {[iter_state_key]: state[iter_state_key], iter_item: null, i: 0};
-            this.reconcileIterable();
+            this.$loop = null;
+            this.$state = state[iter_state_key];
             parent_root.appendChild(this.node);
             subscribers.push([this.state_key, this])
         }
         receive ( k, newData: any) {
             this.reconcileIterable(newData);
-            this.$state[this.state_key] = newData[k];
+            this.$state = newData[k];
         }
 
         arrayStrategy(inputData?: any[]): Array<any> {
-            const oldData = this.$state[this.state_key];
+            const oldData = this.$state;
             const has_changed = oldData.length !== inputData.length;
             const is_prepend = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice((inputData.length - oldData.length)));
             const is_append = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice(0,oldData.length));
-            // const is_prepend = has_changed && oldData.toString() === inputData.slice((inputData.length - oldData.length)).toString();
-            // const is_append = has_changed && oldData.toString() === inputData.slice(0,oldData.length).toString();
+            const noop = !has_changed && !is_append && !is_prepend;
             const strategy = !is_prepend&&!is_append ? 'NEW' : is_append ? 'APPEND' : 'PREPEND';
             const curr = strategy==='NEW'? 0 : oldData.length;
             const itr = is_append ? inputData.slice(oldData.length, inputData.length) : 
@@ -120,11 +138,10 @@ export default function Pico(obj: pico){
             return [strategy, itr, curr];
         }
 
-        reconcileIterable ( inData?: any ) {
-            const oldData: Array<any> = this.$state[this.state_key];
+        reconcileIterable ( inData?: any , outerctx?: loopctx) {
+            const oldData: Array<any> = state[this.state_key];
             const newData: Array<any> = inData && inData[this.state_key]||oldData;
             const [strategy, iterable, cursor] = this.arrayStrategy(newData);
-            console.log(strategy, cursor, iterable)
             const pivotnode: HTMLElement = strategy==='PREPEND' ? this.node.firstChild : this.node;
 
             if(strategy==='NEW'){this.node.innerHTML = '';}
@@ -139,27 +156,44 @@ export default function Pico(obj: pico){
                 })
                 return;
             }
+            // const has_nested = nested.length > 0;
+            let has_nested = false;
             for (let index = 0; index < iterable.length; index++) {
-                this.$state['iter_item'] = iterable[index];
-                this.$state['i'] = cursor + index;
-                this.update();
+                this.$loop = {
+                    iter_item: this.iter_item,
+                    iter_value: iterable[index],
+                    loop: {index: index || cursor},
+                    inner: outerctx
+                }
+                for (let index = 0; index < this.children.length; index++) {
+                    const iblock = this.children[index];
+                    if(iblock.$frags){
+                        has_nested = true;
+                        iblock.reconcileIterable(null, this.$loop);
+                        this.$loop.inner = iblock.$loop;
+                    }
+                }
+                !has_nested && this.update();
                 if(strategy==='PREPEND' ){this.children.forEach(cn=>this.node.insertBefore(cn.node.cloneNode(true), pivotnode));}
                 else{this.children.forEach(cn=>pivotnode.appendChild(cn.node.cloneNode(true)));}
+                this.$loop = null;
             }
         }
 
         update() {
             const memoMap = {};
-            this.$frags.forEach((ifrag) => {
+            this.$frags.forEach((ifrag: IFrag) => {
                 const tmpl = ifrag.$tmpl;
-                memoMap[tmpl] = ifrag.updateTxt(this.$state, memoMap[tmpl]);
+                !ifrag.$render && ifrag.createRender(this.$loop)
+                memoMap[tmpl] = ifrag.updateTxt(state, memoMap[tmpl], this.$loop);
             });
         }
     }
 
-    function processNode(cnode: HTMLElement| any, parent_node: HTMLElement, iter_ctx?: string){
+    function processNode(cnode: HTMLElement| any, parent_node: HTMLElement, iter_ctx?: loopctx){
         if(skipNode(cnode)){return;}
         const is_block_loop = cnode.dataset && 'for' in cnode.dataset;
+        // const is_block_switch = cnode.dataset && 'switch' in cnode.dataset;
         const n = cnode.nodeName==='#text' ? new IFrag(cnode.textContent) : !is_block_loop && new INode(cnode, iter_ctx);
 
         if(cnode.nodeName==='#text'){
@@ -168,7 +202,7 @@ export default function Pico(obj: pico){
                 txtparts.forEach( (vtxt: IFrag) => {
                     parent_node.appendChild(vtxt.node);
                     if(vtxt.$should_update) {
-                        vtxt.createRender(iter_ctx);
+                        !iter_ctx && vtxt.createRender();
                         if(!iter_ctx) {reactfrags.push(vtxt)}else{blockfrags.push(vtxt)}; 
                     }
                 });
@@ -176,12 +210,15 @@ export default function Pico(obj: pico){
             }
         }
   
+        // if(is_block_switch){
+        // }
         if(is_block_loop){
             const b = new IBlock(cnode, parent_node);
-            blockfrags.length = 0;
+            if(!iter_ctx){ b.reconcileIterable(); blockfrags.length = 0;}
             return b;
         }
-        //@ts-ignor Process Attrs
+        
+        //Process Attrs
         cnode.attributes && [...cnode.attributes].map(atr=>{
             if(atr.name.startsWith('on')){  //hydratible node
                 const event_name = atr.name.replace('on','');
@@ -193,7 +230,6 @@ export default function Pico(obj: pico){
             if(atr.value.includes('{')){
                 const pfrag = new IAttr(atr.value, atr.name, n.node);
                 pfrag.createRender(iter_ctx);
-                n.node.setAttributeNode(pfrag.node); //sets an attr node type
                 if(!iter_ctx) {reactfrags.push(pfrag)}else{blockfrags.push(pfrag)}; 
                 return;
             }
@@ -215,9 +251,11 @@ export default function Pico(obj: pico){
     }
     
     function createState(stateObj){
-        const computes = []
+        const computes = [];
+        const ckey = [];
         Object.keys(stateObj.$).forEach(k=>{
             computes.push([k, stateObj.$[k]])
+            ckey.push(k)
             stateObj[k] = stateObj.$[k](stateObj);
         })
         const handler = {
@@ -226,8 +264,8 @@ export default function Pico(obj: pico){
             },
             set(data, key, newvalue){
                 if(key in data && data[key] === newvalue){ return key;}
+                !ckey.includes(key) && computes.forEach(([k, cfunc])=> state[k] = cfunc(data))
                 data[key] = newvalue;
-                computes.forEach(([k, cfunc])=> state[k] = cfunc(state))
                 update(key);
                 return key;
             }
@@ -236,16 +274,22 @@ export default function Pico(obj: pico){
     }
     
     function send( key: any ){
-        subscribers.forEach(([k, isub])=> {if(k===key) {isub.receive(key, state);console.log(key,k, 'Message sent!🎉');}}) 
+        subscribers.forEach(([k, isub])=> {if(k===key) {isub.receive(key, state);}}) 
     }
     
     function receive(id: string, data: any){
         console.log('Youve got mail 🌍💌 from: '+ id, data);
-        if(obj.receive){obj.receive(id, data, state)}else{
-        Object.keys(data).forEach(k=>{ state[k] = data[k]; });  }
+        if(obj.receive){
+            obj.receive(id, data, state)
+        }else{
+            Object.keys(data).forEach(k=>{ state[k] = data[k]; });  
+        }
     }
     
-    function convertNodes(tmpl){return [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];}
+    function convertNodes(tmpl){
+        if(typeof tmpl==='function'){tmpl = tmpl(state)}else if(tmpl.tagName==='TEMPLATE'){return [...tmpl.content.childNodes];}
+        return [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];
+    }
     function skipNode(node): boolean { if(node.nodeName==='STYLE'){styles.push(node)}
         return node.data && node.data.trim()==="" || node.nodeName==='STYLE' || node.nodeName==='#comment'; 
     }
@@ -266,9 +310,11 @@ export default function Pico(obj: pico){
     const root = obj.root;
     const state = createState(obj.state || {});
     const actions = {...obj.actions};
-    const subscribers = [], reactfrags = [], blockfrags = [], styles=[];
-    const domtree = convertNodes(obj.view(state)).map(n=> processNode(n, root)).filter(n=>!!n);
-    console.log(domtree);
+    const subscribers = [], reactfrags = [],  blockfrags = [], styles=[];
+    if(obj.beforemount){
+        obj.beforemount(state)
+    }
+    const domtree = convertNodes(obj.view).map(n=> processNode(n, root)).filter(n=>!!n);
     styles.length > 0 && root.appendChild(...styles);
     update();
     this.__proto__.$ = {send: send, receive: receive, rf: reactfrags, subs: blockfrags, domtree: domtree, actions: actions, root: root, state: state}

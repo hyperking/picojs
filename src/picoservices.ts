@@ -14,8 +14,8 @@ export default function PicoServices (options?: any){
         Promise.all(promise_pool).then(allres => {
             Object.values(endpoints).forEach((callback: Function,i)=>{
                 callback(allres[i], state);
-            })
-            apps.map(app => app.$.receive('picoservices', state))
+            });
+            apps.map(app => app.$.receive('picoservices', state));
         });
     }
 
