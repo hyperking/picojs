@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import viteCompression from 'vite-plugin-compression';
-
 // https://vitejs.dev/config/
 
 export default defineConfig({
@@ -23,15 +22,16 @@ export default defineConfig({
   },
   build:{
     watch: true,
-    minify: true,
+    minify: 'terser',
+    terserOptions:{mangle: {toplevel: true}, compress: {dead_code: false}},
     reportCompressedSize: true,
     lib: {
       entry: './src/lib.ts',
-      name: 'Pico',
+      name: 'Kunai',
       formats: ['umd'],
     },
     outDir: './build'
   },
-  plugins: [viteCompression({algorithm:'gzip'})]
+  plugins: [viteCompression({algorithm: 'brotliCompress'})]
 })
 

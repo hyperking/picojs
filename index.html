@@ -5,39 +5,41 @@
     <title>kunaiJS</title>
     <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
     <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-exp.min.css">
-<link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-icons.min.css">
     <!-- <script src="./build/kunaijs.umd.js"></script> -->
 <script type="module">
     import Kunai from "./src/kunai";
     import KunaiService from "./src/kunaiservices";
 
-    window.app = new KunaiService({
-        protocol: "http",
-        domain: "localhost:3000",
-        call_oninit: ["/api/todos"],
-        headerMap: {"/api/todos": {method: "GET"} },
-        endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
-    }).loadApps([
+    window.app = //new KunaiService({
+        //protocol: "http",
+        //domain: "localhost:3000",
+        //call_oninit: ["/api/todos"],
+       // headerMap: {"/api/todos": {method: "GET"} },
+     //   endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
+   // }).loadApps([
     new Kunai({
-        name: "PicoJs Service demo",
+        name: "Kunai Service demo",
         root: document.getElementById('app'),
         receive(id, newdata, state){
             //state.tablecolumns = Object.keys(newdata.todos[0]);
             state.todos = [...state.todos, ...newdata.todos ] //appends to existing list * recommended
+            
         },
         beforemount: (state)=>{
             console.log('before we mount our nodes...')
+            //window.foo = null;
             state.tablecolumns = ['done', 'id', 'name' ];
         },
         actions: {
             increment: (state) => {
+                console.log('inc')
                 state.likes += 1;
             },
             decrement: (state) => {
                 state.likes -= 1;
             },
             addtodo( state ){ 
-                console.log('addtodo')
                 state.todo = event.target.value;
                 if(!state.todo || (event.key !== 'Enter' && event.type !== 'click')){return;}
                 state.todos = [...state.todos, {name: state.todo, done: false, id: state.todos.length}]
@@ -48,13 +50,18 @@
                 state.mouse = m;
             },
             overRideTodos(state){
-                state.todos = [{done: true, id: state.todos.length, name: `foo ${state.todos.length}` }]
+                state.tablecolumns = ['name','id','done']
+                //state.todos = [{done: true, id: state.todos.length, name: `foo ${state.todos.length}` }]
             },
             appendTodos(state){
                 state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
             },
             prependTodos(state){
                 state.todos = [{name: `foo ${state.todos.length}`, done: true, id: state.todos.length}, ...state.todos] //prepends to existing list
+            },
+            markDone(state){
+                const i = event.target.id;
+                console.log(i)
             },
             showMeter(state){
                 console.log(event.target)
@@ -79,7 +86,7 @@
         },
         view: document.getElementById('app-template')
         })
-        ]);
+        //]);
 </script>
 
 </head>
@@ -96,11 +103,6 @@
               <tr data-for="col in tablecolumns">
                 <td>{thing[col]}</td>
               </tr>
-              <!-- <tr >
-                <td>{thing.done}</td>
-                <td>{loop.index}</td>
-                <td>{thing.name}</td>
-              </tr> -->
             </tbody>
           </table>
     </template>
@@ -111,37 +113,10 @@
             .green{color: green;}
             .strike{text-decoration: line-through}
             .todolist{background: aliceblue; padding: 1rem;}
-            #app{margin: 0 auto; padding:2rem; max-width: 500px;}
+            #app{margin: 0 auto; padding:2rem; max-width: 700px;}
         </style>
         Fun times, improving, exploring, and developing features
         <TestComponent></TestComponent>
-        <div class="todolist" onclick="foo">
-        <ol class="dyn-list menu" data-for="thing in todos">
-            <li class="menu-item">
-                <label class="{'form-checkbox'+ (thing.name==='pico' ? ' strike':'')}">
-                <label class="form-checkbox'">
-                    <input type="checkbox" value="{thing.name}" checked="{thing.name.length>4 ? 'checked':''}">
-                    <i class="form-icon"></i> {thing.name}
-                </label>
-            </li>
-            ---{loop.index}
-        </ol></div>
-        <div class="character">
-            <span>x:{state.mouse.x} y: {state.mouse.y}</span>
-            <img class="img-responsive col-2" src={state.character} style="margin: 0 auto;"/>
-        </div>
-        <table class="table table-striped table-hover" onmousemove="handleMousemove">
-            <thead>
-              <tr data-for="key in tablecolumns">
-                <th>{key}</th>
-              </tr>
-            </thead>
-            <tbody data-for="thing in todos">
-              <tr data-for="col in tablecolumns">
-                <td>{thing[col]}</td>
-              </tr>
-            </tbody>
-        </table>
         <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
         <p>Likes: {state.likes}</p>
         <div class="form-group">
@@ -156,11 +131,38 @@
         </div>
         <div class="btn-group btn-group-block">
             <button onclick="increment" class="btn btn-primary">+Likes</button>
-            <button onclick="showMeter" class="btn btn-primary">Show Meter</button>
+            <button onclick="markDone" class="btn btn-primary">Show Meter</button>
             <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
         </div>
+        <div class="todolist">
+        <ol class="dyn-list menu" data-for="thing in todos">
+            <li class="menu-item" id="{loop.index}" >
+                <label class="form-checkbox">
+                    <input type="checkbox" value="{thing.name}" checked="{thing.name.length>4 ? 'checked':''}">
+                    <i class="form-icon" ></i> {thing.name} - {state.likes} 
+                    <button onclick="markDone" id="{loop.index}">done</button>
+                </label>
+            </li>
+            ---{loop.index}
+        </ol></div>
+        <div class="character">
+            <span>x:{state.mouse.x} y: {state.mouse.y}</span>
+            <img class="img-responsive col-2" src={state.character} style="margin: 0 auto;"/>
+        </div>
+        <!-- <table class="table table-striped table-hover" onmousemove="handleMousemove">
+            <thead>
+              <tr data-for="key in tablecolumns">
+                <th>{key}<button onclick="()=>sortTableBy(key)">^</button></th>
+              </tr>
+            </thead>
+            <tbody data-for="thing in todos">
+              <tr data-for="col in tablecolumns">
+                <td>{col==='id' ? outerloop.index+1 : thing[col]} </td>
+              </tr>
+            </tbody>
+        </table> -->
     </template>
-    <div id="app"><h1>Kunai dojo</h1></div>
+    <div id="app"><h1>kunai dojo</h1></div>
 </body>
 
 </html>
