@@ -8,15 +8,19 @@ type kunai = {
     root?: HTMLElement
 }
 type loopctx = {
+    pivotnode?: HTMLElement,
+    strategy?: Strategy,
     iter_item: string,
     iter_value?: any,
     loop?: any,
-    inner?: loopctx
+    outer?: loopctx
 }
 enum Strategy {
+    NOOP,
     NEW,
     APPEND,
-    PREPEND
+    PREPEND,
+    DELETE,
 }
 function partText (str): string[] {
     function useRegex(input) {
@@ -38,32 +42,36 @@ export default function Kunai(obj: kunai){
         $render: Function;
         $attr_name?: string;
     
-        constructor(str: string, parent_node: HTMLElement, should_update?: boolean, iter_ctx?: loopctx, attr_name?: string){
+        constructor(str: string, parent_node: HTMLElement, should_update?: boolean, attr_name?: string){
             this.$tmpl = str;
             this.$should_update = should_update
             this.$attr_name = attr_name
             this.node = attr_name ? document.createAttribute(attr_name) : document.createTextNode(str);
             if(this.$should_update) {
-                if(iter_ctx) {
-                    blockfrags.push(this)
-                }else{
-                    this.createRender(iter_ctx);
-                    reactfrags.push(this)
-                }; 
+                // if(bloop) {
+                //     blockfrags.push(this)
+                // }else{
+                //     this.createRender();
+                //     reactfrags.push(this)
+                // }; 
+                this.createRender(bloopctx);
+                this.updateTxt(state, null, bloopctx);
+                reactfrags.push(this);
             }
             insertNode(this, parent_node);
         }
     
         createRender(iloop?: loopctx){
             const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'');
-            const outerctx = (iloop && iloop.inner) && iloop.inner.iter_item;
+            const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
             this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
         }
     
         updateTxt(state, memoMap?: any, loopctx?: loopctx): any{
-            const innerctxv = (loopctx && loopctx.inner) && loopctx.inner.iter_value;
-            const innerctxl = (loopctx && loopctx.inner) && loopctx.inner.loop;
-            const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, innerctxv, innerctxl) : this.$render(state);
+            const outerctxv = (loopctx && loopctx.outer) && loopctx.outer.iter_value;
+            const outerctxl = (loopctx && loopctx.outer) && loopctx.outer.loop;
+            const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, outerctxv, outerctxl) : this.$render(state);
+            // console.log(v, this)
             if(this.$attr_name){
                 this.node.value = v;
                 const is_input = this.node.ownerElement && this.node.ownerElement.nodeName==='INPUT';
@@ -75,63 +83,71 @@ export default function Kunai(obj: kunai){
         }
     }
     class IAttr extends IFrag{
-        constructor( attr_name:string, attr_val: string, nodeEl: HTMLElement, iter_ctx?: loopctx){
+        constructor( attr_name:string, attr_val: string, nodeEl: HTMLElement){
             const tmpl = partText(attr_val).map(st=>{
                 if(st.includes("{")){
                     return st.replace('{','').replace('}','')
                 } return `"${st}"`
             }).join(' + ');
-            super(tmpl, nodeEl, true, iter_ctx, attr_name)
+            super(tmpl, nodeEl, true, attr_name)
         }
     }
 
     class INode {
         node: HTMLElement | any;
         children: Array<any>;
-        constructor(olnode: HTMLElement|any, parent_node: HTMLElement, iter_ctx?: loopctx){
+        constructor(olnode: HTMLElement|any, parent_node: HTMLElement){
             this.node = document.createElement(olnode.nodeName);
+            this.children = [...olnode.childNodes];
             // copy Attrs
             olnode.attributes && [...olnode.attributes].map(atr=>{
                 if(atr.value.includes('{')){
-                    new IAttr( atr.name, atr.value, this.node, iter_ctx);
+                    new IAttr( atr.name, atr.value, this.node);
                 }else{
                     this.node.setAttribute(atr.name, atr.value);
                 }
             })
-            this.children = (this.constructor!==IBlock && olnode.childNodes.length > 0 ) ? [...olnode.childNodes]
-                .reduce((nl, cn)=>{
-                    const n = processNode(cn, this.node, iter_ctx);
-                    if(!n){return nl}
-                    if(Array.isArray(n)){ n.forEach(fn=> nl.push(fn)) }else{ nl.push(n) }
-                    return nl;
-                },[]) : [...olnode.childNodes];
-            this.constructor!==IBlock && insertNode(this, parent_node);
+            !bloop_init && this.processChildren()
+            insertNode(this, parent_node);
+        }
+        processChildren(loopctx?: loopctx){
+            const res = (this.children && this.children.length > 0 ) ? this.children
+            .reduce((nl, cn)=>{
+                const n = processNode(cn, this.node);
+                if(!n){return nl}
+                if(Array.isArray(n)){ n.forEach(fn=> nl.push(fn)) }else{ nl.push(n) }
+                return nl;
+            },[]) : null;
+            // !res && console.log(res, this.node)
+            return res;
         }
     }
 
     class IBlock extends INode{
         iter_item: string;
         state_key: string;
-        $loop: loopctx;
+        $loopctx: loopctx;
         $frags: any[];
         $state: any[];
         $nested_keys = new Set();
-        constructor(block_node: HTMLElement, parent_root: HTMLElement, loop_ctx?: loopctx){
+        constructor(block_node: HTMLElement, parent_root: HTMLElement){
             const [iter_name, iter_state_key] = block_node.dataset.for.split(' in ');
-            super(block_node, parent_root, loop_ctx)
+            bloop_init = true;
+            super(block_node, parent_root)
+            bloop_init = false
+
             this.$nested_keys.add(iter_state_key);
             this.$frags = [...blockfrags];
             this.iter_item = iter_name;
             this.state_key = iter_state_key;
             this.$state = state[iter_state_key];
-            insertNode(this, parent_root);
-            if(!loop_ctx){
-                this.reconcileIterable(); 
-                subscribers.push([this.state_key, this, [...this.$nested_keys, 'likes']])
-            }
+            this.node.innerHTML = '';
+            this.reconcileIterable(null, bloopctx); 
+            subscribers.push([this.state_key, this, [...this.$nested_keys]])
         }
 
         receive ( k, newData: any) {
+            if(k!==this.state_key){ return;}
             this.reconcileIterable(newData);
             this.$state = newData[k];
         }
@@ -141,135 +157,64 @@ export default function Kunai(obj: kunai){
             const has_changed = oldData.length !== inputData.length;
             const is_prepend = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice((inputData.length - oldData.length)));
             const is_append = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice(0,oldData.length));
-            // const noop = !has_changed && !is_append && !is_prepend;
-            const strategy = !is_prepend&&!is_append ? Strategy.NEW : is_append ? Strategy.APPEND : Strategy.PREPEND;
+            const noop = !has_changed && !is_append && !is_prepend && this.node.innerHTML !== '';
+            const strategy = (!is_prepend && !is_append && !noop) ? Strategy.NEW : is_append ? Strategy.APPEND : is_prepend ? Strategy.PREPEND: Strategy.NOOP;
             const curr = strategy===Strategy.NEW? 0 : oldData.length;
             const itr = is_append ? inputData.slice(oldData.length, inputData.length) : 
             is_prepend ? inputData.slice(0,inputData.length - oldData.length) : inputData;
             return [strategy, itr, curr];
         }
 
-        reconcileIterable ( inData?: any , outerctx?: loopctx) {
+        reconcileIterable ( inData?: any, outerctx?: loopctx) {
             const oldData: Array<any> = state[this.state_key];
             const newData: Array<any> = inData && inData[this.state_key]||oldData;
             const [strategy, iterable, cursor] = this.arrayStrategy(newData);
             const pivotnode: HTMLElement = strategy===Strategy.PREPEND ? this.node.firstChild : this.node;
-            blockfrags.length = 0;
-            if(strategy===Strategy.NEW){this.node.innerHTML = '';}
-            if(strategy==='DELETE'){
-                oldData.forEach((o,i)=>{
-                    const start = i * this.children.length;
-                    if(!newData.includes(o)){
-                        for (let index = 0; index < this.children.length; index++) {
-                            this.node.childNodes[start].remove();
-                        }
-                    }
-                })
-                return;
-            }
+
+            console.log(this.node, bloopctx)
+
             for (let index = 0; index < iterable.length; index++) {
-                blockfrags.length = 0;
-                this.$loop = {
+                bloopctx = {
+                    pivotnode: pivotnode,
+                    strategy: strategy,
                     iter_item: this.iter_item,
                     iter_value: iterable[index],
                     loop: {index: strategy===Strategy.NEW ? index : cursor+index},
-                    inner: outerctx
+                    outer: outerctx
                 }
-                for (let index = 0; index < this.children.length; index++) {
-                    const ichild: any = this.children[index];
-                    const inode: any = processNode(ichild, this.node, this.$loop);
-                    if(!inode) continue
-                    // this.update(blockfrags, this.$loop)
-                    if(ichild===IBlock){
-                        this.$nested_keys.add(ichild.state_key);
-                        ichild.reconcileIterable(null, this.$loop);
-                    }else{
-                        this.update(blockfrags, this.$loop)
-                    }
-                }
+                const cblock = this.processChildren();      
             }
-            // for (let index = 0; index < iterable.length; index++) {
-            //     this.$loop = {
-            //         iter_item: this.iter_item,
-            //         iter_value: iterable[index],
-            //         loop: {index: strategy===Strategy.NEW ? index : cursor+index},
-            //         inner: outerctx
-            //     }
-            //     for (let index = 0; index < this.children.length; index++) {
-            //         const ichild: any = this.children[index];
-            //         if(ichild===IBlock){
-            //             this.$nested_keys.add(ichild.state_key);
-            //             ichild.reconcileIterable(null, this.$loop);
-            //         }else{
-            //             this.update();
-            //             insertNode(ichild, this.node, strategy, pivotnode, true);
-            //         }
-            //     }
-            // }
+            bloopctx = undefined
         }
 
-        update(frags, loopctx) {
-            const memoMap = {};
-            frags.forEach((ifrag: IFrag) => {
-                const tmpl = ifrag.$tmpl;
-                !ifrag.$render && ifrag.createRender(loopctx)
-                memoMap[tmpl] = ifrag.updateTxt(state, memoMap[tmpl], loopctx);
-            });
-        }
-
-        // update() {
-        //     const memoMap = {};
-        //     this.$frags.forEach((ifrag: IFrag) => {
-        //         const tmpl = ifrag.$tmpl;
-        //         !ifrag.$render && ifrag.createRender(this.$loop)
-        //         memoMap[tmpl] = ifrag.updateTxt(state, memoMap[tmpl], this.$loop);
-        //     });
-        // }
     }
 
-    function processFrag(textContent: string, parent_node: HTMLElement, iter_ctx?: loopctx){
+    function processFrag(textContent: string, parent_node: HTMLElement){
         const txtparts = partText(textContent);
         const txtFrags = [];
         txtparts && txtparts.forEach((match, i) => {
             const [left, right] = textContent.split(match);
-            let lfrag = left.trim()!="" ? new IFrag(left, parent_node, false, iter_ctx) : left;
-            let rfrag = new IFrag(match, parent_node, true, iter_ctx);
+            let lfrag = left.trim()!="" ? new IFrag(left, parent_node, false) : left;
+            let rfrag = new IFrag(match, parent_node, true);
             if(left.trim()!="") {txtFrags.push(lfrag);}
             txtFrags.push(rfrag);
             textContent = right;
             if (i+1 === txtparts.length && textContent.trim()!=""){
-                txtFrags.push(new IFrag(left, parent_node,false, iter_ctx))
+                txtFrags.push(new IFrag(left, parent_node,false))
             }
         });
         
-        return txtparts ? txtFrags : [new IFrag(textContent, parent_node, false, iter_ctx)]
+        return txtparts ? txtFrags : [new IFrag(textContent, parent_node, false)]
     }
-    function processNode(oldNode: HTMLElement | any, parent_node: HTMLElement, iter_ctx?: loopctx){
+
+    function processNode(oldNode: HTMLElement | any, parent_node: HTMLElement){
         if(skipNode(oldNode)){return;}
         const is_block_loop = (oldNode.dataset && 'for' in oldNode.dataset);
         const is_block_switch = oldNode.dataset && 'switch' in oldNode.dataset;
-        const newNode: any = oldNode.nodeName==='#text' ? processFrag(oldNode.textContent, parent_node, iter_ctx) : 
-        !is_block_loop ? new INode(oldNode, parent_node, iter_ctx) : 
-        new IBlock(oldNode, parent_node, iter_ctx);
-        // if(is_block_loop){ 
-        //     if(!iter_ctx){
-        //         newNode.reconcileIterable(); blockfrags.length = 0;
-        //         subscribers.push([newNode.state_key, newNode, [...newNode.$nested_keys]])
-        //     }
-        // }
+        const newNode: any = oldNode.nodeName==='#text' ? processFrag(oldNode.textContent, parent_node) : 
+        !is_block_loop ? new INode(oldNode, parent_node) : 
+        new IBlock(oldNode, parent_node);
         return newNode;
-    }
-    
-    function xhydrateNode(newIobject: INode | IBlock){
-        newIobject.node.attributes && [...newIobject.node.attributes].forEach(atr=>{
-            if(atr.name.startsWith('on')){ 
-                newIobject.node.removeAttribute(atr.name);
-                const event_name = atr.name.replace('on','');
-                const event_callback = atr.value;
-                vapply_events(newIobject.node, event_name, event_callback);
-                return;
-            }
-        })
     }
 
     function hydrateNode(newNode: HTMLElement, attrs){
@@ -278,31 +223,33 @@ export default function Kunai(obj: kunai){
                 newNode.removeAttribute(atr.name);
                 const event_name = atr.name.replace('on','');
                 const event_callback = atr.value;
-                // console.log(event_name, newNode)
                 vapply_events(newNode, event_name, event_callback);
-                // return;
             }
         })
     }
 
-    function insertNode(newIobject: INode | IBlock | IFrag, parent_node: HTMLElement, strategy?: Strategy, pivotnode?: HTMLElement, clone?:boolean){
+    function insertNode(newIobject: INode | IBlock | IFrag, parent_node: HTMLElement){
         if(newIobject.constructor.name === 'IAttr'){
             return parent_node && parent_node.setAttributeNode(newIobject.node)
         }
-        const insert_obj = clone ? newIobject.node.cloneNode(true) : newIobject.node
+        const insert_obj = bloopctx ? newIobject.node : newIobject.node
         hydrateNode(insert_obj, newIobject.node.attributes)
-        switch(strategy){
+        switch(bloopctx && bloopctx.strategy){
+            case Strategy.NOOP:
+                break;
+            case Strategy.DELETE:
             case Strategy.PREPEND:
-                parent_node && parent_node.insertBefore(insert_obj, pivotnode);
+                console.log(bloopctx.strategy, bloopctx.pivotnode, insert_obj)
+                // parent_node && parent_node.insertBefore(insert_obj, bloopctx.pivotnode);
                 break;
             default:
                 parent_node && parent_node.appendChild(insert_obj);
         }
     }
 
-    function update(key?: string) {
+    function update( key?: string, frags?: IFrag[],) {
         const memoMap = {};
-        reactfrags.forEach((ifrag) => {
+        (frags||reactfrags).forEach((ifrag) => {
             const tmpl = ifrag.$tmpl
             if( key && tmpl.indexOf(key) === -1 ){return;}
             memoMap[tmpl] = ifrag.updateTxt(state, memoMap[tmpl]);
@@ -330,7 +277,6 @@ export default function Kunai(obj: kunai){
             computes.push([k, stateObj.$[k], refs])
             ckey.push(k)
             stateObj[k] = stateObj.$[k](stateObj);
-            console.log(k, refs)
         });
         delete stateObj.$;
         const handler = {
@@ -367,6 +313,7 @@ export default function Kunai(obj: kunai){
         if(typeof tmpl==='function'){tmpl = tmpl(state)}else if(tmpl.tagName==='TEMPLATE'){return [...tmpl.content.childNodes];}
         return [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];
     }
+
     function skipNode(node): boolean { if(node.nodeName==='STYLE'){styles.push(node)}
         return node.data && node.data.trim()==="" || node.nodeName==='STYLE' || node.nodeName==='#comment'; 
     }
@@ -378,7 +325,9 @@ export default function Kunai(obj: kunai){
         const Ihandler = (event) => { eventHandler(state, event); }
         vnode.addEventListener(evtType,Ihandler);
     }
-    
+
+    let bloop_init = false;
+    let bloopctx: loopctx = undefined;
     const root = obj.root;
     const state = createState(obj.state || {});
     const actions = {...obj.actions};
@@ -387,8 +336,8 @@ export default function Kunai(obj: kunai){
         obj.beforemount(state)
     }
     const domtree = convertNodes(obj.view).map(n=> processNode(n, root)).filter(n=>!!n);
+    //@ts-ignore
     styles.length > 0 && root.appendChild(...styles);
-    update();
 
-    this.__proto__.$ = {send: send, receive: receive, rf: reactfrags, subs: subscribers, domtree: domtree, actions: actions, root: root, state: state}
+    this.__proto__.$ = {send: send, receive: receive, rf: reactfrags,bf: blockfrags, subs: subscribers, domtree: domtree, actions: actions, root: root, state: state}
 }

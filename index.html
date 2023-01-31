@@ -61,7 +61,7 @@
             },
             markDone(state){
                 const i = event.target.id;
-                console.log(i)
+                console.log(i, event.target)
             },
             showMeter(state){
                 console.log(event.target)
@@ -106,6 +106,16 @@
             </tbody>
           </table>
     </template>
+    <template id="app-templates">
+        <style>.todolist{padding:1rem; background-color: aliceblue;}</style>
+        <div class="todolist">
+            <ol class="dyn-list menu" data-for="thing in todos">
+                <li class="menu-item" id="{loop.index}" >
+                    {thing.name} - {state.likes} 
+                    <button onclick="markDone" id="{loop.index}">mark as done</button>
+                </li>
+            </ol></div>
+        </template>
     <template id="app-template">
         <style>
             ol{list-style: decimal outside;}
@@ -134,22 +144,20 @@
             <button onclick="markDone" class="btn btn-primary">Show Meter</button>
             <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
         </div>
-        <div class="todolist">
+        <div class="todolist" onmousemove="handleMousemove">
         <ol class="dyn-list menu" data-for="thing in todos">
-            <li class="menu-item" id="{loop.index}" >
+            <li class="menu-item">
                 <label class="form-checkbox">
-                    <input type="checkbox" value="{thing.name}" checked="{thing.name.length>4 ? 'checked':''}">
-                    <i class="form-icon" ></i> {thing.name} - {state.likes} 
-                    <button onclick="markDone" id="{loop.index}">done</button>
+                    {thing.name} - {state.likes} 
+                    <button onclick="markDone">done {loop.index}</button>
                 </label>
             </li>
-            ---{loop.index}
         </ol></div>
         <div class="character">
             <span>x:{state.mouse.x} y: {state.mouse.y}</span>
             <img class="img-responsive col-2" src={state.character} style="margin: 0 auto;"/>
         </div>
-        <!-- <table class="table table-striped table-hover" onmousemove="handleMousemove">
+        <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
               <tr data-for="key in tablecolumns">
                 <th>{key}<button onclick="()=>sortTableBy(key)">^</button></th>
@@ -160,7 +168,7 @@
                 <td>{col==='id' ? outerloop.index+1 : thing[col]} </td>
               </tr>
             </tbody>
-        </table> -->
+        </table>
     </template>
     <div id="app"><h1>kunai dojo</h1></div>
 </body>
