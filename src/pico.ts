@@ -1,4 +1,4 @@
-type kunai = {
+type TPico = {
     view: Function;
     state?: any; 
     actions?: any;
@@ -33,7 +33,7 @@ function partText (str): string[] {
     var frags = reFrag.map((r,_)=> r);
     return frags;
 };
-export default function Kunai(obj: kunai){
+export default function Pico(obj: TPico){
     
     class IFrag {
         $tmpl: string;
@@ -48,12 +48,6 @@ export default function Kunai(obj: kunai){
             this.$attr_name = attr_name
             this.node = attr_name ? document.createAttribute(attr_name) : document.createTextNode(str);
             if(this.$should_update) {
-                // if(bloop) {
-                //     blockfrags.push(this)
-                // }else{
-                //     this.createRender();
-                //     reactfrags.push(this)
-                // }; 
                 this.createRender(bloopctx);
                 this.updateTxt(state, null, bloopctx);
                 reactfrags.push(this);
@@ -107,10 +101,11 @@ export default function Kunai(obj: kunai){
                     this.node.setAttribute(atr.name, atr.value);
                 }
             })
-            !bloop_init && this.processChildren()
+            !bloop_init && this.processChildren();
             insertNode(this, parent_node);
         }
-        processChildren(loopctx?: loopctx){
+
+        processChildren(){
             const res = (this.children && this.children.length > 0 ) ? this.children
             .reduce((nl, cn)=>{
                 const n = processNode(cn, this.node);
@@ -126,8 +121,6 @@ export default function Kunai(obj: kunai){
     class IBlock extends INode{
         iter_item: string;
         state_key: string;
-        $loopctx: loopctx;
-        $frags: any[];
         $state: any[];
         $nested_keys = new Set();
         constructor(block_node: HTMLElement, parent_root: HTMLElement){
@@ -137,13 +130,11 @@ export default function Kunai(obj: kunai){
             bloop_init = false
 
             this.$nested_keys.add(iter_state_key);
-            this.$frags = [...blockfrags];
             this.iter_item = iter_name;
             this.state_key = iter_state_key;
             this.$state = state[iter_state_key];
-            this.node.innerHTML = '';
             this.reconcileIterable(null, bloopctx); 
-            subscribers.push([this.state_key, this, [...this.$nested_keys]])
+            !bloopctx && subscribers.push([this.state_key, this, []])
         }
 
         receive ( k, newData: any) {
@@ -170,9 +161,8 @@ export default function Kunai(obj: kunai){
             const newData: Array<any> = inData && inData[this.state_key]||oldData;
             const [strategy, iterable, cursor] = this.arrayStrategy(newData);
             const pivotnode: HTMLElement = strategy===Strategy.PREPEND ? this.node.firstChild : this.node;
-
-            console.log(this.node, bloopctx)
-
+            console.log(strategy)
+            if(strategy===Strategy.NOOP){return }
             for (let index = 0; index < iterable.length; index++) {
                 bloopctx = {
                     pivotnode: pivotnode,
@@ -235,9 +225,8 @@ export default function Kunai(obj: kunai){
         const insert_obj = bloopctx ? newIobject.node : newIobject.node
         hydrateNode(insert_obj, newIobject.node.attributes)
         switch(bloopctx && bloopctx.strategy){
-            case Strategy.NOOP:
-                break;
             case Strategy.DELETE:
+                break;
             case Strategy.PREPEND:
                 console.log(bloopctx.strategy, bloopctx.pivotnode, insert_obj)
                 // parent_node && parent_node.insertBefore(insert_obj, bloopctx.pivotnode);

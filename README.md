@@ -2,9 +2,10 @@
 
 A micro library for building fine-grained reactive frontend user interfaces on the web.
 
-`bundle size: 4.48kb / gzip: 1.92kb`
+`bundle size: 4.99kb / brotliCompress: 1.94kb`
 
 **App example**
+
 ```js
 import Pico from "pico";
 const app = new Pico({
@@ -16,12 +17,7 @@ const app = new Pico({
 // Output: <div id="app"><h1>Hello World</h1></div>
 ```
 
+**This Project is experimental and exploring concepts around reactive web frameworks.**
 
-**Fully supports:**
 
-- Typescript & Vanilla Javascript
-- NO JSX!
-- Single file components coming soon!
-
-**This Project is experimental and serves as an example of reactive web applications.**
 

@@ -27,7 +27,7 @@ export default defineConfig({
     reportCompressedSize: true,
     lib: {
       entry: './src/lib.ts',
-      name: 'Kunai',
+      name: 'Pico',
       formats: ['umd'],
     },
     outDir: './build'
