@@ -1,4 +1,4 @@
-# Kunai JS
+# Pico JS
 
 A micro library for building fine-grained reactive frontend user interfaces on the web.
 
