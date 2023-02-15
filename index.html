@@ -47,7 +47,7 @@
                 state.mouse = m;
             },
             shuffleColumns(state){
-                state.tablecolumns = ['name','id','done']
+                state.tablecolumns = state.tablecolumns[0] === 'name' ? ['id','done','name'] : ['name','id','done']
             },
             appendTodos(state){
                 state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
@@ -144,7 +144,7 @@
         </style>
         Fun times, improving, exploring, and developing features
         <!-- <TestComponent></TestComponent> -->
-        <!-- <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
+        <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
         <p>Likes: {state.likes}, Sorting by: {JSON.stringify(state.sortcolumns)}</p>
         <div class="form-group">
             <label class="form-label">Name</label>
@@ -160,7 +160,7 @@
             <button onclick="increment" class="btn btn-primary">+Likes</button>
             <button onclick="markDone" class="btn btn-primary">Show Meter</button>
             <button onclick="decrement" class="btn btn-primary">-Dislikes</button>
-        </div> -->
+        </div>
         <!-- <div class="todolist" onmousemove="handleMousemove">
         <ol class="dyn-list menu" data-for="thing in todos">
             <li class="menu-item">
@@ -185,7 +185,7 @@
             </thead>
             <tbody data-for="thing in filteredTodos">
               <tr data-for="col in tablecolumns">
-                <td>{@html col==='id' ? outerloop.index+1 : highlight(thing[col])} 
+                <td>{col==='id' ? outerloop.index+1 : thing[col]}
                     <!-- <ul data-for="item in items"><li>{item} , {loop.index}</li></ul> -->
                 </td>
               </tr>
