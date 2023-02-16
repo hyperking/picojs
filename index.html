@@ -53,7 +53,7 @@
                 state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
             },
             prependTodos(state){
-                state.todos = [{name: `foo ${state.todos.length}`, done: true, id: state.todos.length}, ...state.todos] //prepends to existing list
+                state.todos = [{done: true, id: state.todos.length, name: `foo ${state.todos.length}`}, ...state.todos] //prepends to existing list
             },
             sortby(state){
                 let key = event.target.dataset.sortby;
@@ -63,6 +63,7 @@
                     return typeof value === 'string' ? value.toLowerCase() : value;
                 }
                 const stodos = state.todos.sort((cursor, next_cursor) => (normalize(cursor[key]) > normalize(next_cursor[key])) ?  (dsc_order ? 1 : -1) : (dsc_order ? -1 : 1));
+                console.log(stodos)
                 state.todos = [...stodos];
             },
             markDone(state){
@@ -185,7 +186,7 @@
             </thead>
             <tbody data-for="thing in filteredTodos">
               <tr data-for="col in tablecolumns">
-                <td>{col==='id' ? outerloop.index+1 : thing[col]}
+                <td>{thing[col]}
                     <!-- <ul data-for="item in items"><li>{item} , {loop.index}</li></ul> -->
                 </td>
               </tr>
