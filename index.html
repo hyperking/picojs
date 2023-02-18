@@ -5,18 +5,18 @@
     <title>PicoJS</title>
     <link rel="stylesheet" href="/style.css">
     <!-- <script src="./build/picojs.umd.js.br"></script> 
-    new PicoServices({
+   
+    -->
+<script type="module">
+    import Pico from "./src/pico";
+    import PicoServices from "./src/picoservices";
+    window.app =  new PicoServices({
         protocol: "http",
         domain: "localhost:3000",
         call_oninit: ["/api/todos"],
         headerMap: {"/api/todos": {method: "GET"} },
         endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
     }).loadApps([
-    -->
-<script type="module">
-    import Pico from "./src/pico";
-    import PicoServices from "./src/picoservices";
-    window.app = 
     new Pico({
         name: "Pico Service demo",
         root: document.getElementById('app'),
@@ -53,7 +53,11 @@
                 state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
             },
             swapTodos(state){
-                state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
+                const itm_one = state.todos[1];
+                const itm_two = state.todos[3];
+                state.todos[1] = itm_two;
+                state.todos[3] = itm_one;
+                state.todos = [...state.todos];
             },
             prependTodos(state){
                 state.todos = [{done: true, id: state.todos.length, name: `foo ${state.todos.length}`}, ...state.todos] //prepends to existing list
@@ -106,7 +110,7 @@
         },
         view: document.getElementById('app-template')
         })
-        //]);
+        ]);
 </script>
 
 </head>
@@ -190,14 +194,14 @@
             <tbody data-for="thing in filteredTodos">
               <tr data-for="col in tablecolumns">
                 <td>{thing[col]} : {state.likes}
-                    <ul data-for="item in items">
+                    <!-- <ul data-for="item in items">
                         <li>{item} , {loop.index}
                             <ul data-for="letter in item">
                                 <li>{letter} :: {loop.index}</li>
                                 <li data-for='x in ["just ","a ","random ","list "]'>{x.toUpperCase()}</li>
                             </ul>
                         </li>
-                    </ul>
+                    </ul> -->
                 </td>
               </tr>
             </tbody>
