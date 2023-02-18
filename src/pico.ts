@@ -14,6 +14,7 @@ enum Strategy {
     APPEND,
     PREPEND,
     DELETE,
+    MODIFY
 }
 enum BlockTypes {
     FORLOOP = 'FORLOOP',
@@ -24,7 +25,6 @@ function partText (str): string[] {
     function useRegex(input) {
         const regex = /\{[\s]*.*?[\s]*\}/gs;
         const res = [...input.matchAll(regex)];
-        console.log(res, str)
         return res.length > 0 ? res.map(a => a[0].replace()) : false;
     }
     var reFrag = useRegex(str);
@@ -33,13 +33,7 @@ function partText (str): string[] {
     return frags;
 };
 export default function Pico(obj: TPico){
-    function highlight(text) {
-        // console.log(state, text);
-        if (!state.filterFor || !text) {
-            return text;
-        }
-        return text.replace(state.filterFor, `<span class="highlight">${state.filterFor}</span>`);
-    }
+
     type loopctx = {
         frags?: IFrag[],
         pivotnode?: HTMLElement,
@@ -84,9 +78,8 @@ export default function Pico(obj: TPico){
             const as_html = this.$tmpl.startsWith('{@html')
             const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'').replace('@html','');
             const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
-            const locals = `${highlight.toString()}\n`;
             if(as_html){this.as_html = true}
-            this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", locals + "return " + t ) : Function("state", "return " + t );
+            this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
         }
     
         updateTxt(state, memoMap?: any, loopctx?: loopctx): any{
@@ -173,7 +166,6 @@ export default function Pico(obj: TPico){
         constructor(block_node: HTMLElement, parent_root: HTMLElement){
             const [iter_name, iter_state_key] = block_node.dataset.for.split(' in ');
             const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
-            des_statekey && console.log(des_statekey)
             const add_sub = BLOCK_KEYS.size === 0;
             SKIP_CHILDREN = true;
             super(block_node, parent_root)
@@ -183,7 +175,8 @@ export default function Pico(obj: TPico){
             this.state_key = des_statekey ? null : iter_state_key;
             this.$state = des_statekey || state[iter_state_key] ||  LOOPCTX.iter_value;
             this.reconcileIterable(LOOPCTX);
-            
+            // const has_nested = [...BLOCK_KEYS].slice([...BLOCK_KEYS].indexOf(this.state_key)).length===1
+            // if(add_sub || has_nested) subscribers.push(this);
             if(add_sub) {
                 this.foreignKeys = [...BLOCK_KEYS].slice(1);
                 subscribers.push(this);
@@ -192,35 +185,36 @@ export default function Pico(obj: TPico){
         }
 
         receive ( k, newData: any) {
+            console.log('---'+ k)
             this.reconcileIterable();
-            if(k===this.state_key){ this.$state = newData[k];}
         }
 
         arrayStrategy(inputData?: any[]): Array<any> {
+            if(!IS_READY) return [Strategy.NEW, inputData, 0];
             const oldData = this.$state;
             const has_changed = oldData.length !== inputData.length || JSON.stringify(oldData) !== JSON.stringify(inputData);
             const is_prepend = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice((inputData.length - oldData.length)));
             const is_append = has_changed && JSON.stringify(oldData) === JSON.stringify(inputData.slice(0,oldData.length));
             const is_delete = oldData.length < inputData.length || inputData.length < oldData.length;
+            const is_modify = has_changed
             const noop = !has_changed && (!is_append && !is_prepend) && this.node.innerHTML !== '';
-            const strategy = noop ? Strategy.NOOP : is_append ? Strategy.APPEND : is_prepend ? Strategy.PREPEND : is_delete ? Strategy.DELETE : Strategy.NEW;
+            const strategy = this.node.innerHTML === '' ? Strategy.NEW 
+            : is_append ? Strategy.APPEND 
+            : is_prepend ? Strategy.PREPEND 
+            : is_delete ? Strategy.DELETE 
+            : is_modify ? Strategy.MODIFY : Strategy.NOOP;
             const curr = strategy===Strategy.NEW? 0 : oldData.length;
             const itr = is_append ? inputData.slice(oldData.length, inputData.length) : 
             is_prepend ? inputData.slice(0,inputData.length - oldData.length) : inputData;
-            // console.log(is_delete)
             return [strategy, itr, curr];
         }
 
         reconcileIterable ( outerctx?: loopctx) {
             BLOCK_KEYS.add(this.state_key)
             const oldData: Array<any> = this.$state;
-            const newData: Array<any> = state && state[this.state_key]||oldData;
-            // let [strategy, iterable, cursor] = this.arrayStrategy(newData);
+            const newData: Array<any> = state[this.state_key]||oldData;
             let [strategy, iterable, cursor] = (LOOPCTX && LOOPCTX.strategy) ? [LOOPCTX.strategy, newData, 0] : this.arrayStrategy(newData);
             const pivotnode: HTMLElement = strategy===Strategy.PREPEND ? this.node.firstChild : this.node;
-            // if(strategy===Strategy.NOOP){return }
-            // if(strategy===Strategy.NEW){ this.node.innerHTML = ''; this.blockNodes = []; this.frags = [];}
-
             for (let index = 0; index < iterable.length; index++) {
 
                 LOOPCTX = {
@@ -231,9 +225,11 @@ export default function Pico(obj: TPico){
                     loop: {index: (strategy===Strategy.NEW ? index : cursor+index)},
                     outer: outerctx
                 }
-                if(!is_ready||strategy===Strategy.APPEND||strategy===Strategy.PREPEND){
-                    const is_root = BLOCK_KEYS.keys().next().value === this?.state_key;
-                    const defaultstrategy = !is_root ? Strategy.NEW : strategy
+                console.log(strategy, this.node)
+                if(!IS_READY){
+                    this.processChildren(Strategy.NEW);
+                }else if(strategy===Strategy.APPEND||strategy===Strategy.PREPEND||!IS_READY){
+                    const defaultstrategy = !outerctx ? strategy : Strategy.NEW
                     this.processChildren(defaultstrategy);
                 } else {
                     if(this.blockNodes && this.blockNodes[index].constructor.name==='IBlock') {
@@ -248,6 +244,7 @@ export default function Pico(obj: TPico){
             }
 
             LOOPCTX = undefined
+            this.$state = newData
         }
 
     }
@@ -267,7 +264,6 @@ export default function Pico(obj: TPico){
             }
         });
         const res = txtparts ? txtFrags : new IFrag(textContent, parent_node, false)
-        // console.log(res, textContent)
         return res
     }
 
@@ -391,7 +387,7 @@ export default function Pico(obj: TPico){
     }
 
     let SKIP_CHILDREN = false;
-    let is_ready = false;
+    let IS_READY = false;
     let LOOPCTX: loopctx = undefined;
     let BLOCK_KEYS = new Set();
     const root = obj.root;
@@ -401,10 +397,12 @@ export default function Pico(obj: TPico){
     if(obj.beforemount){
         obj.beforemount(state)
     }
-    const domtree = convertNodes(obj.view).map(n=> processNode(n, root)).filter(n=>!!n);
+    const domtree: HTMLElement[] = convertNodes(obj.view);
+    const vdomtree = domtree.map(n=> processNode(n, root)).filter(n=>!!n);
+    console.log(vdomtree)
     //@ts-ignore
     styles.length > 0 && root.appendChild(...styles);
-    is_ready = true;
+    IS_READY = true;
 
     this.__proto__.$ = {send: send, receive: receive, rf: reactfrags,bf: BLOCK_KEYS, subs: subscribers, domtree: domtree, actions: actions, root: root, state: state}
 }

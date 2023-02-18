@@ -52,6 +52,9 @@
             appendTodos(state){
                 state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
             },
+            swapTodos(state){
+                state.todos = [...state.todos, {done: true, id: state.todos.length, name: `foo ${state.todos.length}`}] //appends to existing list * recommended
+            },
             prependTodos(state){
                 state.todos = [{done: true, id: state.todos.length, name: `foo ${state.todos.length}`}, ...state.todos] //prepends to existing list
             },
@@ -142,8 +145,7 @@
             .todolist{background: aliceblue; padding: 1rem;}
             span.highlight { background: aqua; }
             #app{margin: 0 auto; padding:2rem; max-width: 700px;}
-        </style>
-        <p>Fun times, improving, exploring, and developing features</p>
+        </style> 
         <!-- <TestComponent></TestComponent> -->
         <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
         <p>Likes: {state.likes}, Sorting by: {JSON.stringify(state.sortcolumns)}</p>
@@ -155,6 +157,7 @@
         <div class="btn-group btn-group-block">
             <button onclick="prependTodos" class="btn">Prepend Todos <span>{state.likes}</span></button>
             <button onclick="appendTodos" class="btn">Append Todos <span>{state.likes}</span></button>
+            <button onclick="swapTodos" class="btn">Swap Todos <span>{state.likes}</span></button>
             <button onclick="shuffleColumns" class="btn">Shuffle Columns<span>{state.likes}</span></button>
         </div>
         <div class="btn-group btn-group-block">
@@ -191,7 +194,7 @@
                         <li>{item} , {loop.index}
                             <ul data-for="letter in item">
                                 <li>{letter} :: {loop.index}</li>
-                                <li data-for='x in ["a","b","c"]'>{x.toUpperCase()} {loop.index}</li>
+                                <li data-for='x in ["just ","a ","random ","list "]'>{x.toUpperCase()}</li>
                             </ul>
                         </li>
                     </ul>
@@ -200,7 +203,9 @@
             </tbody>
         </table>
     </template>
-    <div id="app"><h3 style="margin: 0 auto; width: 120px; padding: 2rem 0; color: deeppink; letter-spacing: -1px;">pico<small>.js</small></h3></div>
+    <div id="app"><h3 style="margin: 0 auto; width: 120px; padding: 2rem 0; color: deeppink; letter-spacing: -1px;">pico<small>.js</small></h3>
+        <small>(used in units of measurement) denoting a factor of one trillionth <span>10-<sup>12</sup></span>.</small>
+    </div>
 </body>
 
 </html>
