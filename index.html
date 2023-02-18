@@ -143,7 +143,7 @@
             span.highlight { background: aqua; }
             #app{margin: 0 auto; padding:2rem; max-width: 700px;}
         </style>
-        Fun times, improving, exploring, and developing features
+        <p>Fun times, improving, exploring, and developing features</p>
         <!-- <TestComponent></TestComponent> -->
         <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
         <p>Likes: {state.likes}, Sorting by: {JSON.stringify(state.sortcolumns)}</p>
@@ -186,8 +186,15 @@
             </thead>
             <tbody data-for="thing in filteredTodos">
               <tr data-for="col in tablecolumns">
-                <td>{thing[col]}
-                    <!-- <ul data-for="item in items"><li>{item} , {loop.index}</li></ul> -->
+                <td>{thing[col]} : {state.likes}
+                    <ul data-for="item in items">
+                        <li>{item} , {loop.index}
+                            <ul data-for="letter in item">
+                                <li>{letter} :: {loop.index}</li>
+                                <li data-for='x in ["a","b","c"]'>{x.toUpperCase()} {loop.index}</li>
+                            </ul>
+                        </li>
+                    </ul>
                 </td>
               </tr>
             </tbody>
