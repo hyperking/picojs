@@ -5,18 +5,18 @@
     <title>PicoJS</title>
     <link rel="stylesheet" href="/style.css">
     <!-- <script src="./build/picojs.umd.js.br"></script> 
-   
-    -->
-<script type="module">
-    import Pico from "./src/pico";
-    import PicoServices from "./src/picoservices";
-    window.app =  new PicoServices({
+     new PicoServices({
         protocol: "http",
         domain: "localhost:3000",
         call_oninit: ["/api/todos"],
         headerMap: {"/api/todos": {method: "GET"} },
         endpoints: [["/api/todos", (res, state)=> { state.todos = res.data; }]]
     }).loadApps([
+    -->
+<script type="module">
+    import Pico from "./src/pico";
+    import PicoServices from "./src/picoservices";
+    window.app =
     new Pico({
         name: "Pico Service demo",
         root: document.getElementById('app'),
@@ -110,37 +110,30 @@
         },
         view: document.getElementById('app-template')
         })
-        ]);
+        //]);
 </script>
 
 </head>
 
 <body>
-    <template id="app-templatez">
+    <template id="app-template">
         <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
-              <tr data-for="key in tablecolumns">
-                <th>{key}</th>
+              <tr data-for="tcol in tablecolumns">
+                <th>remove</th>
+                <th>{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
               </tr>
             </thead>
             <tbody data-for="thing in todos">
               <tr data-for="col in tablecolumns">
+                <td><button>remove</button></td>
                 <td>{thing[col]}</td>
               </tr>
             </tbody>
-          </table>
+        </table>
     </template>
+
     <template id="app-templated">
-        <style>.todolist{padding:1rem; background-color: aliceblue;}</style>
-        <div class="todolist">
-            <ol class="dyn-list menu" data-for="thing in todos">
-                <li class="menu-item" id="{loop.index}" >
-                    {thing.name} - {state.likes} 
-                    <button onclick="markDone" id="{loop.index}">mark as done</button>
-                </li>
-            </ol></div>
-        </template>
-    <template id="app-template">
         <style>
             ol{list-style: decimal outside;}
             .red{color: red;}
@@ -178,13 +171,13 @@
                 </label>
             </li>
         </ol></div> -->
-        <div class="character">
+        <!-- <div class="character">
             <span>x:{state.mouse.x} y: {state.mouse.y}</span>
-            <!-- <img class="img-responsive col-2" src={state.character} style="margin: 0 auto;"/> -->
-            <div class="table-search"><label for="table-search">Search</label>
-                <input oninput="setFilter" id="table-search" class="form-input" type="text" placeholder="searching by ...">
-            </div>
-        </div>
+            <img class="img-responsive col-2" src={state.character} style="margin: 0 auto;"/>
+        </div> -->
+        <!-- <div class="table-search"><label for="table-search">Search</label>
+            <input oninput="setFilter" id="table-search" class="form-input" type="text" placeholder="searching by ...">
+        </div> -->
         <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
               <tr data-for="tcol in tablecolumns">
@@ -208,7 +201,7 @@
         </table>
     </template>
     <div id="app"><h3 style="margin: 0 auto; width: 120px; padding: 2rem 0; color: deeppink; letter-spacing: -1px;">pico<small>.js</small></h3>
-        <small>(used in units of measurement) denoting a factor of one trillionth <span>10-<sup>12</sup></span>.</small>
+        <p style="display: block; text-align:center;">(used in units of measurement) denoting a factor of one trillionth <span>10-<sup>12</sup></span>.</p>
     </div>
 </body>
 

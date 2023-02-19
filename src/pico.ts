@@ -175,8 +175,7 @@ export default function Pico(obj: TPico){
             this.state_key = des_statekey ? null : iter_state_key;
             this.$state = des_statekey || state[iter_state_key] ||  LOOPCTX.iter_value;
             this.reconcileIterable(LOOPCTX);
-            // const has_nested = [...BLOCK_KEYS].slice([...BLOCK_KEYS].indexOf(this.state_key)).length===1
-            // if(add_sub || has_nested) subscribers.push(this);
+
             if(add_sub) {
                 this.foreignKeys = [...BLOCK_KEYS].slice(1);
                 subscribers.push(this);
@@ -225,7 +224,6 @@ export default function Pico(obj: TPico){
                     loop: {index: (strategy===Strategy.NEW ? index : cursor+index)},
                     outer: outerctx
                 }
-                console.log(strategy, this.node)
                 if(!IS_READY){
                     this.processChildren(Strategy.NEW);
                 }else if(strategy===Strategy.APPEND||strategy===Strategy.PREPEND||!IS_READY){
