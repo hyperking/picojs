@@ -120,13 +120,11 @@
         <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
               <tr data-for="tcol in tablecolumns">
-                <th>remove</th>
                 <th>{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
               </tr>
             </thead>
             <tbody data-for="thing in todos">
               <tr data-for="col in tablecolumns">
-                <td><button>remove</button></td>
                 <td>{thing[col]}</td>
               </tr>
             </tbody>

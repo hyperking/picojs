@@ -121,7 +121,7 @@ export default function Pico(obj: TPico){
         constructor(olnode: HTMLElement|any, parent_node: HTMLElement){
             this.parent_node = parent_node;
             this.node = document.createElement(olnode.nodeName);
-            this.children = [...olnode.childNodes];
+            this.children = [...olnode.childNodes].filter(n=>!skipNode(n));
             // copy Attrs
             olnode.attributes && [...olnode.attributes].map(atr=>{
                 if(atr.value.includes('{')){
@@ -131,12 +131,12 @@ export default function Pico(obj: TPico){
                 }
             })
             insertNode(this);
-            this.processChildren(Strategy.NEW)
+            !SKIP_CHILDREN && this.processChildren(Strategy.NEW)
             
         }
         
         processChildren(strategy?: Strategy){
-            if(SKIP_CHILDREN){ return }
+            // if(SKIP_CHILDREN){ return }
             const cnodes = this.children || [];
             const applyStrategy = (cblock) => {
                 if((LOOPCTX && LOOPCTX.frags)) {
