@@ -2,7 +2,7 @@
 
 A micro library for building fine-grained reactive frontend user interfaces on the web.
 
-`bundle size: 4.99kb / brotliCompress: 1.94kb`
+`bundle size: 6.40kb / brotliCompress: 2.34kb`
 
 **App example**
 
