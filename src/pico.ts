@@ -17,6 +17,9 @@ enum Strategy {
     MODIFY
 }
 enum BlockTypes {
+    TXT = 'TXT',
+    ATTR = 'ATTR',
+    NODE = 'NODE',
     FORLOOP = 'FORLOOP',
     SWITCH = 'SWITCH',
     COMPONENT = 'COMPONENT'
@@ -46,24 +49,26 @@ export default function Pico(obj: TPico){
     }
     
     class IFrag {
+        type?: BlockTypes;
         $tmpl: string;
         $should_update: boolean;
         node: Text | Attr | any;
         $render: Function;
-        $attr_name?: string;
+        attr_name?: string;
         as_html?: boolean = null;
         parent_node?: HTMLElement;
     
         constructor(str: string, parent_node: HTMLElement, should_update?: boolean, attr_name?: string){
             this.$tmpl = str;
+            this.type = attr_name ? BlockTypes.ATTR : BlockTypes.TXT
             this.parent_node = parent_node;
             this.$should_update = should_update
-            this.$attr_name = attr_name
+            this.attr_name = attr_name
             this.node = attr_name ? document.createAttribute(attr_name) : document.createTextNode(str);
             if(this.$should_update) {
                 this.createRender(LOOPCTX);
                 this.updateTxt(state, null, LOOPCTX);
-                !LOOPCTX && reactfrags.push(this); //TODO: aggregate frags according to block elements
+                !LOOPCTX && reactfrags.push(this);
                 if(LOOPCTX){
                     LOOPCTX.frags ? LOOPCTX.frags.push(this) : LOOPCTX.frags = [this];
                 }
@@ -88,10 +93,10 @@ export default function Pico(obj: TPico){
             const outerctxl = (loopctx && loopctx.outer) && loopctx.outer.loop;
             const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, outerctxv, outerctxl) : this.$render(state);
 
-            if(this.$attr_name){
+            if(this.attr_name){
                 this.node.value = v;
                 const is_input = this.node.ownerElement && this.node.ownerElement.nodeName==='INPUT';
-                if(is_input) { this.node.ownerElement[this.$attr_name] = v;}
+                if(is_input) { this.node.ownerElement[this.attr_name] = v;}
             }else{
                 this.node.textContent = v;
             }
@@ -111,29 +116,54 @@ export default function Pico(obj: TPico){
     }
 
     class INode {
-        reconcileIterable(LOOPCTX: { frags?: IFrag[]; pivotnode?: HTMLElement; strategy?: Strategy; iter_item: string; iter_value?: any; loop?: any; outer?: loopctx; }) {
-            throw new Error("Method not implemented.");
-        }
         node: HTMLElement | any;
         children: Array<any>;
         parent_node?: HTMLElement;
         frags?: Array<IFrag[]>;
         blockNodes: INode[];
+        //Block fields
+        iter_item: string;
+        state_key: string;
+        foreignKeys: any[] = [];
+        type?: BlockTypes = BlockTypes.NODE;
+        $state: any[];
+
         constructor(olnode: HTMLElement|any, parent_node: HTMLElement){
             const is_block = this.constructor === IBlock
             this.parent_node = parent_node;
             this.node = document.createElement(olnode.nodeName);
             this.children = [...olnode.childNodes].filter(n=>!skipNode(n));
             this.processAttrs(olnode, this.node);
+
             if(is_block){
+                const [iter_name, iter_state_key] = olnode.dataset.for.split(' in ');
+                const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
+                const add_sub = NESTED_BLOCK_KEYS.size === 0;
+                const type = olnode.dataset.for ? BlockTypes.FORLOOP : BlockTypes.COMPONENT;
+    
                 const nn = document.createElement(olnode.nodeName);
                 this.processAttrs(olnode, nn)
                 this.children.forEach(n => nn.appendChild(n.cloneNode(true)))
                 this.children = [nn];
                 this.node = parent_node
-            } 
-            !is_block && insertNode(this);
-            !is_block && this.processChildren()   
+
+                this.type = type;
+                this.iter_item = iter_name;
+                this.state_key = des_statekey ? null : iter_state_key;
+                this.$state = des_statekey || state[iter_state_key] ||  LOOPCTX.iter_value;
+                this.reconcileIterable(LOOPCTX);
+    
+                if(add_sub) {
+                    this.foreignKeys = [...NESTED_BLOCK_KEYS].slice(1);
+                    this.blockNodes = BLOCK_NODES.length>0 && [...BLOCK_NODES];
+                    subscribers.push(this);
+                    cleanup()
+                }
+            }else{
+                insertNode(this);
+                this.processChildren()   
+                
+            }
         }
         processAttrs(domnode: HTMLElement, newdom: HTMLElement){
             const SKIP_ATTRS = ['data-for'];
@@ -163,46 +193,13 @@ export default function Pico(obj: TPico){
                 applyStrategy(cnode) 
             }
         }
-    }
 
-    class IBlock extends INode{
-        iter_item: string;
-        state_key: string;
-        foreignKeys: any[] = [];
-        type?: BlockTypes;
-        $state: any[];
-        constructor(block_node: HTMLElement, parent_root: HTMLElement){
-            const [iter_name, iter_state_key] = block_node.dataset.for.split(' in ');
-            const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
-            const add_sub = NESTED_BLOCK_KEYS.size === 0;
-            const type = block_node.dataset.for ? BlockTypes.FORLOOP : BlockTypes.COMPONENT;
-            super(block_node, parent_root)
-
-            this.type = type;
-            this.iter_item = iter_name;
-            this.state_key = des_statekey ? null : iter_state_key;
-            this.$state = des_statekey || state[iter_state_key] ||  LOOPCTX.iter_value;
-            this.reconcileIterable(LOOPCTX);
-
-            if(add_sub) {
-                this.foreignKeys = [...NESTED_BLOCK_KEYS].slice(1);
-                this.blockNodes = BLOCK_NODES.length>0 && [...BLOCK_NODES];
-                subscribers.push(this);
-                this.cleanup()
-            }
-        }
-        cleanup(){
-            console.log(BLOCK_NODES)
-            NESTED_BLOCK_KEYS.clear();
-            BLOCK_NODES.length = 0;
-            LOOPCTX = undefined;
-        }
         receive ( k, newData: any) {
             console.log('---'+ k)
             const strategy = this.arrayStrategy(newData[this.state_key])
             this.reconcileIterable();
             if(this.blockNodes) this.blockNodes = strategy===Strategy.PREPEND ? [...BLOCK_NODES, ...this.blockNodes] : [...this.blockNodes, ...BLOCK_NODES];
-            this.cleanup()
+            cleanup()
 
         }
 
@@ -260,8 +257,9 @@ export default function Pico(obj: TPico){
             }
             this.$state = newData
         }
-
     }
+
+    class IBlock extends INode { }
 
     function processFrag(textContent: string, parent_node: HTMLElement){
         const txtparts = partText(textContent);
@@ -302,8 +300,8 @@ export default function Pico(obj: TPico){
         })
     }
 
-    function insertNode(newIObj: INode | IBlock | IFrag){
-        if(newIObj.$attr_name!==undefined){
+    function insertNode(newIObj: INode | IFrag){
+        if(newIObj.type===BlockTypes.ATTR){
             return newIObj.parent_node && newIObj.parent_node.setAttributeNode(newIObj.node)
         }
         hydrateNode(newIObj.node, newIObj.node.attributes)
@@ -318,8 +316,13 @@ export default function Pico(obj: TPico){
         }
     }
 
+    function cleanup(){
+        NESTED_BLOCK_KEYS.clear();
+        BLOCK_NODES.length = 0;
+        LOOPCTX = undefined;
+    }
+
     function update( key?: string, frags?: IFrag[],) {
-        // console.log(key)
         const memoMap = {};
         (frags||reactfrags).forEach((ifrag) => {
             const tmpl = ifrag.$tmpl || [ifrag.state_key]
@@ -411,6 +414,7 @@ export default function Pico(obj: TPico){
     const domtree: HTMLElement[] = convertNodes(obj.view);
     const vdomtree = domtree.map(n=> processNode(n, root)).filter(n=>!!n);
     console.log(vdomtree)
+    console.log(domtree)
     //@ts-ignore
     styles.length > 0 && root.appendChild(...styles);
     IS_READY = true;
