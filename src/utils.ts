@@ -78,7 +78,7 @@ function compile(vnode: any){
     })
     if(type!==BlockTypes.NODE && textContent){
         const tmp = "const v = '"+textContent.replace('{','\' + (').replace('}',') +\'')+"'";
-        const renderFunc = new Function('state', [tmp,`${targetNode}.textContent = v`].join('\n')).toString()
+        const renderFunc = `(state) => ${[tmp,`${targetNode}.textContent = v`].join('\n')}`
         return `
         const ${targetNode} = document.createTextNode("${textContent}"); 
         const ${targetNode}_render = ${renderFunc}
@@ -116,7 +116,7 @@ function toVnode(olnode: any, parent?: string | ChildNode ): TNode[] {
     const cnodes = (olnode.childNodes && [...olnode.childNodes].map(cn => toVnode(cn, nodeId)).filter(cn=>cn))
     const flowtype = is_frag ? BlockTypes.TXT : is_txt ? BlockTypes.STATIC :
      (olnode.dataset && olnode.dataset.for) ? BlockTypes.FORLOOP :  BlockTypes.NODE
-    
+    !is_txt && olnode.setAttribute('pico-id', nodeId)
     let res = [
         /* parent: */ parent,
         /* id: */ nodeId,

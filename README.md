@@ -1,6 +1,7 @@
 # Pico JS
 
 A micro library for building fine-grained reactive frontend user interfaces on the web.
+Inspired by giants like [Hyperapp](https://github.com/jorgebucaran/hyperapp), [Svelte](https://github.com/sveltejs/svelte), [React](https://github.com/facebook/react), [Vue](https://github.com/vuejs/), and [SolidJs](https://github.com/solidjs/solid)
 
 `bundle size: 6.79 kB │ gzip: 2.88 kB`
 
@@ -18,10 +19,19 @@ A micro library for building fine-grained reactive frontend user interfaces on t
     ```
 3. Preview App running on localhost:3000
 
+**Example Setup**
 
-**This Project is not for production use..at least not at the moment!**
+```js
+import Pico from "pico";
+const app = new Pico({
+    state: {greet: 'Hello'},
+    view:()=>`<h1>{state.greet} World</h1>`,
+    root: document.getElementById('app'),
+    });
 
+// Output: <div id="app"><h1>Hello World</h1></div>
+```
 
-I'm currently exploring frontend reactivity and optimization strategies.
+**This Project is not for Production Use and serves as an Exploratory project**
 
 
