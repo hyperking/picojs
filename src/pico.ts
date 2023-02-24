@@ -1,59 +1,14 @@
-type TPico = {
-    view: Function;
-    state?: any; 
-    actions?: any;
-    receive?: Function;
-    send?: Function;
-    beforemount?: Function;
-    root?: HTMLElement
-}
+import { TPico, BlockTypes, Strategy, LoopCtx, TNode } from "./types";
+import { partText, htmlToDom, compile_analyzer, processAttrs, skipNode } from "./utils";
 
-enum Strategy {
-    NOOP,
-    NEW,
-    APPEND,
-    PREPEND,
-    DELETE,
-    MODIFY
-}
-enum BlockTypes {
-    TXT = 'TXT',
-    ATTR = 'ATTR',
-    NODE = 'NODE',
-    FORLOOP = 'FORLOOP',
-    SWITCH = 'SWITCH',
-    COMPONENT = 'COMPONENT'
-}
-function partText (str): string[] {
-    function useRegex(input) {
-        const regex = /\{[\s]*.*?[\s]*\}/gs;
-        const res = [...input.matchAll(regex)];
-        return res.length > 0 ? res.map(a => a[0].replace()) : false;
-    }
-    var reFrag = useRegex(str);
-    if(!reFrag){return null;}
-    var frags = reFrag.map((r,_)=> r);
-    return frags;
-};
-export default function Pico(obj: TPico){
+export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
 
-    type loopctx = {
-        frags?: IFrag[],
-        blocks?: IBlock[],
-        pivotnode?: HTMLElement,
-        strategy?: Strategy,
-        iter_item: string,
-        iter_value?: any,
-        loop?: any,
-        outer?: loopctx
-    }
-    
     class IFrag {
-        type?: BlockTypes;
-        $tmpl: string;
         $should_update: boolean;
         node: Text | Attr | any;
         $render: Function;
+        type?: BlockTypes;
+        $tmpl: string;
         attr_name?: string;
         as_html?: boolean = null;
         parent_node?: HTMLElement;
@@ -80,7 +35,7 @@ export default function Pico(obj: TPico){
             }
         }
     
-        createRender(iloop?: loopctx){
+        createRender(iloop?: LoopCtx){
             const as_html = this.$tmpl.startsWith('{@html')
             const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'').replace('@html','');
             const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
@@ -88,7 +43,7 @@ export default function Pico(obj: TPico){
             this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
         }
     
-        updateTxt(state, memoMap?: any, loopctx?: loopctx): any{
+        updateTxt(state, memoMap?: any, loopctx?: LoopCtx): any{
             const outerctxv = (loopctx && loopctx.outer) && loopctx.outer.iter_value;
             const outerctxl = (loopctx && loopctx.outer) && loopctx.outer.loop;
             const v = memoMap ? memoMap : loopctx ? this.$render(state, loopctx.iter_value, loopctx.loop, outerctxv, outerctxl) : this.$render(state);
@@ -104,22 +59,13 @@ export default function Pico(obj: TPico){
         }
     }
 
-    class IAttr extends IFrag{
-        constructor( attr_name:string, attr_val: string, nodeEl: HTMLElement){
-            const tmpl = partText(attr_val).map(st=>{
-                if(st.includes("{")){
-                    return st.replace('{','').replace('}','')
-                } return `"${st}"`
-            }).join(' + ');
-            super(tmpl, nodeEl, true, attr_name)
-        }
-    }
+    class IAttr extends IFrag {} 
 
     class INode {
         node: HTMLElement | any;
         children: Array<any>;
         parent_node?: HTMLElement;
-        frags?: Array<IFrag[]>;
+        frags?: Array<any>;
         blockNodes: INode[];
         //Block fields
         iter_item: string;
@@ -128,31 +74,32 @@ export default function Pico(obj: TPico){
         type?: BlockTypes = BlockTypes.NODE;
         $state: any[];
 
-        constructor(olnode: HTMLElement|any, parent_node: HTMLElement){
-            const is_block = this.constructor === IBlock
-            this.parent_node = parent_node;
-            this.node = document.createElement(olnode.nodeName);
-            this.children = [...olnode.childNodes].filter(n=>!skipNode(n));
-            this.processAttrs(olnode, this.node);
+        constructor(astNode: any[]){
+            const [parent_node, id, nodeName, type, textContent, childNodes, attributes] = astNode;
+            this.parent_node = !parent_node ? root : parent_node;
+            this.node = document.createElement(nodeName);
+            this.children = childNodes;
+            this.type = type;
+            const attrFrags = processAttrs(attributes, this.node);
+            attrFrags && attrFrags.map(([name, value])=>{
+                new IAttr( value, this.node, true, name);
+            })
 
-            if(is_block){
-                const [iter_name, iter_state_key] = olnode.dataset.for.split(' in ');
+            if(type===BlockTypes.FORLOOP){
+                const [iter_str] = attributes.filter(([atr, value])=>atr==='data-for').map(([atr, atrv])=>atrv);
+                const [iter_name, iter_state_key] = iter_str.split(' in ')
                 const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
                 const add_sub = NESTED_BLOCK_KEYS.size === 0;
-                const type = olnode.dataset.for ? BlockTypes.FORLOOP : BlockTypes.COMPONENT;
-    
-                const nn = document.createElement(olnode.nodeName);
-                this.processAttrs(olnode, nn)
-                this.children.forEach(n => nn.appendChild(n.cloneNode(true)))
-                this.children = [nn];
-                this.node = parent_node
-
-                this.type = type;
                 this.iter_item = iter_name;
                 this.state_key = des_statekey ? null : iter_state_key;
                 this.$state = des_statekey || state[iter_state_key] ||  LOOPCTX.iter_value;
+                // Re-wrap child node with root node
+                const btree = [parent_node, id, nodeName, BlockTypes.NODE, null, childNodes, attributes]
+                this.children = [btree]
+                this.node = parent_node
+
                 this.reconcileIterable(LOOPCTX);
-    
+
                 if(add_sub) {
                     this.foreignKeys = [...NESTED_BLOCK_KEYS].slice(1);
                     this.blockNodes = BLOCK_NODES.length>0 && [...BLOCK_NODES];
@@ -161,24 +108,13 @@ export default function Pico(obj: TPico){
                 }
             }else{
                 insertNode(this);
-                this.processChildren()   
-                
+                childNodes && this.processChildren(childNodes)
             }
         }
-        processAttrs(domnode: HTMLElement, newdom: HTMLElement){
-            const SKIP_ATTRS = ['data-for'];
-            domnode.attributes && [...domnode.attributes].map(atr=>{
-                if(SKIP_ATTRS.includes(atr.name)) return;
-                if(atr.value.includes('{')){
-                    new IAttr( atr.name, atr.value, newdom);
-                }else{
-                    newdom.setAttribute(atr.name, atr.value);
-                }
-            })
-        }
-        processChildren(){
-            const cnodes = this.children || [];
+
+        processChildren(childNodes){
             const applyStrategy = (Tnode) => {
+                if(!Tnode) return;
                 if((LOOPCTX && LOOPCTX.frags)) {
                     if(!this.frags) this.frags = []
                     this.frags.push(LOOPCTX.frags)
@@ -187,10 +123,11 @@ export default function Pico(obj: TPico){
                     BLOCK_NODES.push(Tnode)
                 }
             }
-            for (let index = 0; index < cnodes.length; index++) {
-                const cnode = processNode(cnodes[index], this.node);
+            for (let index = 0; index < childNodes.length; index++) {
+                const cnode = childNodes[index];
                 if(!cnode) continue;
-                applyStrategy(cnode) 
+                cnode[0] = this.node;
+                applyStrategy(processNode(cnode)) 
             }
         }
 
@@ -200,7 +137,6 @@ export default function Pico(obj: TPico){
             this.reconcileIterable();
             if(this.blockNodes) this.blockNodes = strategy===Strategy.PREPEND ? [...BLOCK_NODES, ...this.blockNodes] : [...this.blockNodes, ...BLOCK_NODES];
             cleanup()
-
         }
 
         arrayStrategy(inputData?: any[]): Strategy {
@@ -228,7 +164,7 @@ export default function Pico(obj: TPico){
             return [strategy, itr, curr];
         }
 
-        reconcileIterable ( outerctx?: loopctx) {
+        reconcileIterable ( outerctx?: LoopCtx) {
             NESTED_BLOCK_KEYS.add(this.state_key)
             const oldData: Array<any> = this.$state;
             const newData: Array<any> = state[this.state_key]||oldData;
@@ -246,7 +182,7 @@ export default function Pico(obj: TPico){
                     outer: outerctx
                 }
                 if(strategy===Strategy.APPEND||strategy===Strategy.PREPEND||!IS_READY){
-                    this.processChildren();
+                    this.processChildren(this.children);
                 } else {
                     if(this.blockNodes && this.blockNodes[index].constructor.name==='IBlock') {
                         this.blockNodes[index].reconcileIterable(LOOPCTX)
@@ -279,13 +215,12 @@ export default function Pico(obj: TPico){
         return res
     }
 
-    function processNode(oldNode: HTMLElement | any, parent_node: HTMLElement){
-        if(skipNode(oldNode)){return;}
-        const is_block_loop = (oldNode.dataset && 'for' in oldNode.dataset);
-        const is_block_switch = oldNode.dataset && 'switch' in oldNode.dataset;
-        const newNode: any = oldNode.nodeName==='#text' ? processFrag(oldNode.textContent, parent_node) : 
-        !is_block_loop ? new INode(oldNode, parent_node) : 
-        new IBlock(oldNode, parent_node);
+    function processNode(astNode: any){
+        if(skipNode(astNode)){ 
+            if(astNode.nodeName==='STYLE') styles.push(astNode)
+            return;}
+        const [parent, id, nodeName, type, textContent, childNodes, attributes] = astNode;
+        const newNode: any = nodeName==='#text' ? processFrag(textContent, parent) : type===BlockTypes.FORLOOP ? new IBlock(astNode) : new INode(astNode); 
         return newNode;
     }
 
@@ -322,26 +257,25 @@ export default function Pico(obj: TPico){
         LOOPCTX = undefined;
     }
 
-    function update( key?: string, frags?: IFrag[],) {
+    function update( key?: string, frags?: IFrag[]) {
         const memoMap = {};
-        (frags||reactfrags).forEach((ifrag) => {
+        let detach = null;
+        (frags||reactfrags).forEach((ifrag, i) => {
+            if(ifrag.type===BlockTypes.TXT && !document.body.contains(ifrag.node)){
+                //collect garbage
+                detach = !detach ? [i] : detach.concat(i);
+                console.log(ifrag.node)
+                return
+            }
             const tmpl = ifrag.$tmpl || [ifrag.state_key]
-            if( key && tmpl.indexOf(key) === -1 ){return;}
+            if( key && tmpl.indexOf(key) === -1 ){ return;}
             memoMap[tmpl] = ifrag.updateTxt(state, memoMap[tmpl], LOOPCTX);
         });
-        key && send(key);
-    }
-
-    function compile_analyzer(str){
-        function useRegex(input) {
-            const regex = /state.[a-z,A-Z]+/g;
-            const res = [...input.matchAll(regex)];
-            return res.length > 0 ? res.reduce((rmap, r)=>{
-                rmap.add(r[0].replace('state.',''))
-                return rmap;
-            },new Set()) : false;
-        }
-        return useRegex(str)
+        //sweap garbage
+        detach && detach.forEach(id=> reactfrags.splice(id, 1))
+        key && subscribers.forEach((isub: IBlock)=> {
+            if(isub.state_key===key || isub.foreignKeys.includes(key)) isub.receive(key, state);
+        }) 
     }
 
     function createState(stateObj){
@@ -371,10 +305,7 @@ export default function Pico(obj: TPico){
         return new Proxy(stateObj, handler);
     }
     
-    function send( key: any ){
-        subscribers.forEach((isub: IBlock)=> {
-            if(isub.state_key===key || isub.foreignKeys.includes(key)) isub.receive(key, state);
-        }) 
+    function emit( key: any ){
     }
     
     function receive(id: string, data: any){
@@ -384,16 +315,7 @@ export default function Pico(obj: TPico){
             Object.keys(data).forEach(k=>{ state[k] = data[k]; });  
         }
     }
-    
-    function convertNodes(tmpl){
-        if(typeof tmpl==='function'){tmpl = tmpl(state)}else if(tmpl.tagName==='TEMPLATE'){return [...tmpl.content.childNodes];}
-        return [...document.createRange().createContextualFragment(tmpl.trim()).childNodes];
-    }
 
-    function skipNode(node): boolean { if(node.nodeName==='STYLE'){styles.push(node)}
-        return node.data && node.data.trim()==="" || node.nodeName==='STYLE' || node.nodeName==='#comment'; 
-    }
-    
     //Dispatch event handlers on target dom nodes
     function vapply_events (vnode: HTMLElement, evtType: string, callback: string | Function){
         let eventHandler = typeof callback === 'function' ? callback : actions[callback];
@@ -402,7 +324,7 @@ export default function Pico(obj: TPico){
         vnode.addEventListener(evtType,Ihandler);
     }
 
-    let IS_READY, LOOPCTX: loopctx = undefined;
+    let IS_READY, LOOPCTX: LoopCtx = undefined;
     let NESTED_BLOCK_KEYS = new Set();
     const root = obj.root;
     const actions = {...obj.actions};
@@ -411,13 +333,14 @@ export default function Pico(obj: TPico){
     if(obj.beforemount){
         obj.beforemount(state)
     }
-    const domtree: HTMLElement[] = convertNodes(obj.view);
-    const vdomtree = domtree.map(n=> processNode(n, root)).filter(n=>!!n);
-    console.log(vdomtree)
-    console.log(domtree)
-    //@ts-ignore
-    styles.length > 0 && root.appendChild(...styles);
+    if(!PRECOMPILED){
+        const DomTree: ChildNode[] = htmlToDom(typeof obj.view==='function'? obj.view(state) : obj.view);
+        DomTree.forEach(n=> processNode(n));
+    }else{
+        PRECOMPILED.forEach(n=> processNode(n));
+    }
+    (styles.length > 0) && styles.forEach(styl=>root.appendChild(styl));
     IS_READY = true;
-
-    this.__proto__.$ = {send: send, receive: receive, rf: reactfrags,bf: NESTED_BLOCK_KEYS, subs: subscribers, domtree: domtree, actions: actions, root: root, state: state}
+    
+    this.__proto__.$ = {send: emit, receive: receive, rf: reactfrags, subs: subscribers, actions: actions, root: root, state: state}
 }

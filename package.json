@@ -10,6 +10,7 @@
   "author": "Derry Livenski",
   "license": "MIT",
   "devDependencies": {
+    "object-sizeof": "^2.6.1",
     "terser": "^5.16.1",
     "vite": "^4.0.4",
     "vite-plugin-compression": "^0.5.1"

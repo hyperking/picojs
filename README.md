@@ -2,22 +2,26 @@
 
 A micro library for building fine-grained reactive frontend user interfaces on the web.
 
-`bundle size: 6.40kb / brotliCompress: 2.34kb`
+`bundle size: 6.79 kB │ gzip: 2.88 kB`
 
-**App example**
+`bundle size: 6.63kb | brotliCompress: 2.51kb`
 
-```js
-import Pico from "pico";
-const app = new Pico({
-    state: {greet: 'Hello'},
-    view:()=>`<h1>{state.greet} World</h1>`,
-    root: document.getElementById('app'),
-    });
+**Install**
 
-// Output: <div id="app"><h1>Hello World</h1></div>
-```
+1. Clone repo
+    ```
+    git clone git@github.com:hyperking/picojs.git
+    ```
+2. CD into local directory and run NPM
+    ```
+    npm install && npm run dev
+    ```
+3. Preview App running on localhost:3000
 
-**This Project is experimental and exploring concepts around reactive web frameworks.**
 
+**This Project is not for production use..at least not at the moment!**
+
+
+I'm currently exploring frontend reactivity and optimization strategies.
 
 
