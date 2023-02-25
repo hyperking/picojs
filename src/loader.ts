@@ -11,4 +11,4 @@ const appAST = domToAST(appView)
 // App.compiledView = appAST
 
 // Deploy
-new Pico(App, appAST)
+window.app = new Pico(App, appAST)

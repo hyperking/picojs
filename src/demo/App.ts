@@ -1,15 +1,22 @@
+import { TPico, IEvent } from "@src/types";
 import ListApp from "./ListApp";
 
-const App = {
-    componets: [ListApp],
-    name: "Pico Service demo",
+//@ts-ignore
+const App: TPico = {
+    components: [ListApp],
     root: document.getElementById('app'),
     receive(id, newdata, state) {
         state.todos = [...state.todos, ...newdata.todos]
     },
     beforemount: (state) => {
-        console.log('before we mount our nodes...')
+        console.log('before we mount our nodes...');
         state.tablecolumns = ['done', 'id', 'name'];
+        // function spamlikes() { 
+        //     state.likes += 1 
+        //     if(state.likes === 30) {clearInterval(clearId)}
+        // }
+        // const clearId = setInterval(spamlikes, 1000)
+        
     },
     actions: {
         increment: (state) => {
@@ -19,8 +26,8 @@ const App = {
         decrement: (state) => {
             state.likes -= 1;
         },
-        addtodo(state) {
-            state.todo = event.target.value;
+        addtodo(state, event: IEvent) {
+            state.todo = event.target && event.target.value;
             if (!state.todo || (event.key !== 'Enter' && event.type !== 'click')) { return; }
             state.todos = [...state.todos, { name: state.todo, done: false, id: state.todos.length }]
             state.todo = ''
@@ -30,12 +37,23 @@ const App = {
             state.mouse = m;
         },
         shuffleColumns(state) {
-            state.tablecolumns = state.tablecolumns[0] === 'name' ? ['id', 'done', 'name'] : ['name', 'id', 'done']
+            function shuffleArray(array) {
+                for (var i = array.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var temp = array[i];
+                    array[i] = array[j];
+                    array[j] = temp;
+                }
+                console.log(array)
+                return array
+            }
+            state.tablecolumns = [...shuffleArray(state.tablecolumns)]
         },
         appendTodos(state) {
             state.todos = [...state.todos, { done: true, id: state.todos.length, name: `foo ${state.todos.length}` }] //appends to existing list * recommended
         },
         swapTodos(state) {
+            if(state.todos.length < 3) {return;}
             const itm_one = state.todos[1];
             const itm_two = state.todos[3];
             state.todos[1] = itm_two;
@@ -45,7 +63,7 @@ const App = {
         prependTodos(state) {
             state.todos = [{ done: true, id: state.todos.length, name: `foo ${state.todos.length}` }, ...state.todos] //prepends to existing list
         },
-        sortby(state) {
+        sortby(state, event: IEvent) {
             let key = event.target.dataset.sortby;
             state.sortcolumns = { [key]: !state.sortcolumns[key] };
             const dsc_order = state.sortcolumns[key];
@@ -56,7 +74,7 @@ const App = {
             console.log(stodos)
             state.todos = [...stodos];
         },
-        markDone(state) {
+        markDone(state, event: IEvent) {
             const i = event.target.id;
             console.log(i, event.target)
         },
@@ -64,7 +82,7 @@ const App = {
             console.log(event.target)
             state.showMeter = !state.showMeter;
         },
-        setFilter(state) {
+        setFilter(state, event: IEvent) {
             state.filterFor = event.target.value;
         }
     },
@@ -91,13 +109,16 @@ const App = {
         todo: '',
         mouse: { x: 0, y: 0 }
     },
+    view: (state)=>{
+        return `<button class="btn" onclick="{()=>console.count('thing')}">remove</button>`
+    },
     view: (state) => {
         return `
         <style>
             ol { list-style: decimal outside; } .red { color: red; } .green { color: green; } .strike { text-decoration: line-through } .todolist { background: aliceblue; padding: 1rem; } span.highlight { background: aqua; } #app { margin: 0 auto; padding: 2rem; max-width: 700px; }
         </style>
 
-        <h2 class="{state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
+        <h2 class="foo {state.todos.length % 2===0 ? 'green': 'red'}">Todos: {state.todos.length}</h2>
         <p>Likes: {state.likes}, Sorting by: {JSON.stringify(state.sortcolumns)}</p>
         <div class="form-group">
             <label class="form-label">Name</label>
@@ -119,15 +140,18 @@ const App = {
         <div class="character">
             {state.character}
         </div>
+        <ListApp>...</ListApp>
         <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
                 <tr>
-                    <th data-for="tcol in tablecolumns">{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
+                <th>Remove</th>
+                <th data-for="tcol in tablecolumns">{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
                 </tr>
             </thead>
             <tbody>
                 <tr data-for="thing in filteredTodos">
-                    <td data-for="col in tablecolumns">{thing[col]} : {state.likes}
+                    <td><button onclick="{()=>console.log(thing)}">remove</button></td>
+                    <td data-for="col in tablecolumns">{thing[col]}
                         <!--<ul>
                         <li data-for="item in items">{item} , {loop.index}
                             <ul>
@@ -141,7 +165,7 @@ const App = {
             </tbody>
             <tfoot>
                 <tr>
-                    <th colspan="2" class="table-search">
+                    <th colspan="{state.tablecolumns.length}" class="table-search">
                         <label for="table-search">Search</label>
                         <input oninput="setFilter" id="table-search" class="form-input" type="text" placeholder="searching by ...">
                     </th>

@@ -1,5 +1,4 @@
 import { BlockTypes, TNode } from "./types";
-import sizeof from 'object-sizeof'
 
 /**
 * Analizes a given HTMLElement to determine if it should be processed
@@ -101,15 +100,25 @@ function compile(vnode: any){
 }
 
 /**
-* Converts HTMLDOM element into PicoNode object
+* Converts HTMLDOM element into TNode object
 * @param  HTMLElement olnode html element to be converted
 * @param string | ChildNode parent optional element parent id as string or parent dom element
-* @return PicoNode} picoNode representing a dom node
+* @return TNode
 */
 function toVnode(olnode: any, parent?: string | ChildNode ): TNode[] {
     const vnodeId = () => 'pico_'+(Math.random() + 1).toString(36).substring(7);
+    const processAttrs = () => olnode.attributes && [...olnode.attributes].map((atr) => {
+        const should_update = atr.value.includes('{')
+        const attr = [
+            /* name: */ atr.name,
+            /* value:  */should_update ? concatTemplate(atr.value) : atr.value,
+            /*should_update: */ should_update
+            /* parent: nodeId*/ 
+            ]
+        return attr; 
+        })
     const skip = skipNode(olnode)
-    if(skip) return olnode;
+    if(skip) return olnode.nodeName==='STYLE' && olnode;
     const is_txt = olnode.nodeName === '#text'
     const is_frag = is_txt && olnode.textContent.includes('{')
     const nodeId = vnodeId();
@@ -124,25 +133,18 @@ function toVnode(olnode: any, parent?: string | ChildNode ): TNode[] {
         /* flowtype: */ flowtype, 
         /* textContent: */ (is_txt ? olnode.textContent : null),
         /* childNodes: */ cnodes,
-        /* attributes: */ olnode.attributes && [...olnode.attributes].map((atr) => {
-            const attr = [
-                /* name: */ atr.name,
-                /* value:  */atr.value,
-                /* parent: nodeId*/ 
-                ]
-            return attr; 
-            })
+        /* attributes: */ processAttrs()
         ]
     return res        
 }
 
-export function processAttrs(astAttrs: any[], parent?: HTMLElement): string[]{
-    const SKIP_ATTRS = ['data-for'];
+export function applyAttrs(astAttrs: any[], parent?: HTMLElement): string[]{
+    const SKIP_ATTRS = ['data-for','data-switch','data-case'];
     const attrFrags = [];
     astAttrs.forEach(atr=>{
-       const [name, value] = atr;
+       const [name, value, should_update] = atr;
         if(SKIP_ATTRS.includes(name)) return;
-        if(value.includes('{')){
+        if(should_update){
             const iattr = concatTemplate(value);
             attrFrags.push([name, iattr])
         }else{

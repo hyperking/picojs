@@ -1,5 +1,5 @@
 import { TPico, BlockTypes, Strategy, LoopCtx, TNode } from "./types";
-import { partText, htmlToDom, compile_analyzer, processAttrs, skipNode } from "./utils";
+import { partText, htmlToDom, compile_analyzer, applyAttrs, skipNode, concatTemplate } from "./utils";
 
 export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
 
@@ -19,9 +19,11 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
             this.parent_node = parent_node;
             this.$should_update = should_update
             this.attr_name = attr_name
+            this.as_html = str.startsWith('{@html')
             this.node = attr_name ? document.createAttribute(attr_name) : document.createTextNode(str);
             if(this.$should_update) {
-                this.createRender(LOOPCTX);
+                const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'').replace('@html','');
+                this.$render = createRender(t, LOOPCTX);
                 this.updateTxt(state, null, LOOPCTX);
                 !LOOPCTX && reactfrags.push(this);
                 if(LOOPCTX){
@@ -33,14 +35,6 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
             }else{
                 insertNode(this);
             }
-        }
-    
-        createRender(iloop?: LoopCtx){
-            const as_html = this.$tmpl.startsWith('{@html')
-            const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'').replace('@html','');
-            const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
-            if(as_html){this.as_html = true}
-            this.$render = iloop ? Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
         }
     
         updateTxt(state, memoMap?: any, loopctx?: LoopCtx): any{
@@ -75,18 +69,25 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
         $state: any[];
 
         constructor(astNode: any[]){
+            let iter_str;
+            const SKIP_ATTRS = ['data-for','data-switch','data-case'];
             const [parent_node, id, nodeName, type, textContent, childNodes, attributes] = astNode;
             this.parent_node = !parent_node ? root : parent_node;
             this.node = document.createElement(nodeName);
             this.children = childNodes;
             this.type = type;
-            const attrFrags = processAttrs(attributes, this.node);
-            attrFrags && attrFrags.map(([name, value])=>{
-                new IAttr( value, this.node, true, name);
+            attributes && attributes.forEach(attrAST=>{
+                // LOOPCTX && console.log(attrAST, this.node)
+                const [name, value, should_update] = attrAST;
+                if(SKIP_ATTRS.includes(name)) { iter_str = value; return;}
+                if(should_update){
+                    new IAttr( value, this.node, true, name);
+                }else{
+                    this.node.setAttribute(name, value);
+                }
             })
 
             if(type===BlockTypes.FORLOOP){
-                const [iter_str] = attributes.filter(([atr, value])=>atr==='data-for').map(([atr, atrv])=>atrv);
                 const [iter_name, iter_state_key] = iter_str.split(' in ')
                 const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
                 const add_sub = NESTED_BLOCK_KEYS.size === 0;
@@ -108,12 +109,14 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
                 }
             }else{
                 insertNode(this);
+                if(LOOPCTX&&LOOPCTX.strategy===Strategy.PREPEND){LOOPCTX.strategy = Strategy.APPEND;}
                 childNodes && this.processChildren(childNodes)
             }
         }
-
+        
         processChildren(childNodes){
             const applyStrategy = (Tnode) => {
+                LOOPCTX && console.log(Tnode, LOOPCTX.frags)
                 if(!Tnode) return;
                 if((LOOPCTX && LOOPCTX.frags)) {
                     if(!this.frags) this.frags = []
@@ -196,6 +199,16 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
     }
 
     class IBlock extends INode { }
+
+    function createRender(t:string, iloop?: LoopCtx, inline?: boolean): Function {
+        const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
+        let locals = inline && iloop ? [`const ${iloop.iter_item} = ${JSON.stringify(iloop.iter_value)};`,`const loop = ${JSON.stringify(iloop.loop)};`, 
+        (outerctx ? `const ${iloop.outer.iter_item} = ${JSON.stringify(iloop.outer.iter_value)}; \n const outerloop = ${JSON.stringify(iloop.outer.loop)};` : '')].join('\n') : '';
+        if(locals){
+            return new Function('state', locals+'\n return '+t)
+        }
+        return iloop ? new Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
+    }
 
     function processFrag(textContent: string, parent_node: HTMLElement){
         const txtparts = partText(textContent);
@@ -318,8 +331,12 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
 
     //Dispatch event handlers on target dom nodes
     function vapply_events (vnode: HTMLElement, evtType: string, callback: string | Function){
-        let eventHandler = typeof callback === 'function' ? callback : actions[callback];
-        if(!eventHandler){console.log('Unable to assign '+callback); return null;}
+        let eventHandler = typeof callback === 'function' ? callback 
+        : callback[0]==='(' ? createRender("("+callback+")()", LOOPCTX, true)
+        // : callback[0]==='(' ? Function("("+callback+")()")
+        : actions[callback] && actions[callback];
+        if(!eventHandler){console.log('Unable to assign '+callback); return;}
+        // callback[0]==='(' && console.log(LOOPCTX, eventHandler)
         const Ihandler = (event) => { eventHandler(state, event); }
         vnode.addEventListener(evtType,Ihandler);
     }

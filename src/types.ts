@@ -49,12 +49,12 @@ export interface PicoNode extends TNode {
     node: HTMLElement
 }
 export type TPico = {
+    components?: Array<TPico>,
     view: Function;
     state?: any;
     actions?: any;
     receive?: Function;
     emit?: Function;
-    components?: TPico[];
     beforemount?: Function;
     root?: HTMLElement
 }
@@ -68,6 +68,16 @@ export type LoopCtx = {
     iter_value?: any,
     loop?: any,
     outer?: LoopCtx
+}
+export type ITarget = {
+    dataset: any;
+    id: any;
+    value: any;
+}
+export type IEvent = {
+    target: ITarget;
+    key: any;
+    type: any;
 }
 export enum Strategy {
     NOOP,
