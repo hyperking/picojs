@@ -20,10 +20,17 @@ export default defineConfig({
       "@src": ["/src"]
     }
   },
+  esbuild: {
+    keepNames: false,
+    drop: ['console', 'debugger'],
+  },
   build:{
     watch: true,
     minify: 'terser',
-    terserOptions:{mangle: {toplevel: true}, compress: {dead_code: false}},
+    terserOptions:{
+      mangle: true, 
+      compress: true,
+    },
     reportCompressedSize: true,
     lib: {
       entry: './src/lib.ts',

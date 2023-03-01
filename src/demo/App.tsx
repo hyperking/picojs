@@ -44,13 +44,13 @@ const App: TPico = {
                     array[i] = array[j];
                     array[j] = temp;
                 }
-                console.log(array)
+                // console.log(array)
                 return array
             }
             state.tablecolumns = [...shuffleArray(state.tablecolumns)]
         },
         appendTodos(state) {
-            state.todos = [...state.todos, { done: true, id: state.todos.length, name: `foo ${state.todos.length}` }] //appends to existing list * recommended
+            state.todos = [...state.todos, { done: true, id: state.todos.length*3, name: `foo ${state.todos.length}` }] //appends to existing list * recommended
         },
         swapTodos(state) {
             if(state.todos.length < 3) {return;}
@@ -61,7 +61,7 @@ const App: TPico = {
             state.todos = [...state.todos];
         },
         prependTodos(state) {
-            state.todos = [{ done: true, id: state.todos.length, name: `foo ${state.todos.length}` }, ...state.todos] //prepends to existing list
+            state.todos = [{ done: true, id: state.todos.length*3, name: `foo ${state.todos.length}` }, ...state.todos] //prepends to existing list
         },
         sortby(state, event: IEvent) {
             let key = event.target.dataset.sortby;
@@ -109,11 +109,38 @@ const App: TPico = {
         todo: '',
         mouse: { x: 0, y: 0 }
     },
-    view: (state)=>{
-        return `<button class="btn" onclick="{()=>console.count('thing')}">remove</button>`
-    },
-    view: (state) => {
-        return `
+    // xview: (state)=>{
+    //     return `<table class="table table-striped table-hover" onmousemove="handleMousemove">
+    //     <thead>
+    //         <tr>
+    //         <th data-for="tcol in tablecolumns">{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
+    //         </tr>
+    //     </thead>
+    //     <tbody>
+    //         <tr data-for="thing in filteredTodos">
+    //             <td>{thing.done} : {state.likes}</td>
+    //             <td>{thing.id} : {state.likes}</td>
+    //             <td>{thing.name} : {state.likes}</td>
+    //         </tr>
+    //     </tbody>
+    //     </table>`},
+    // view: (state)=>{
+    //     return `<table class="table table-striped table-hover" onmousemove="handleMousemove">
+    //     <thead>
+    //         <tr>
+    //         <th>Remove</th>
+    //         <th data-for="tcol in tablecolumns">{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
+    //         </tr>
+    //     </thead>
+    //     <tbody>
+    //         <tr data-for="thing in filteredTodos">
+    //             <td><button class="foo" onclick="{()=>{console.log('button')}}">remove</button></td>
+    //             <td data-for="col in tablecolumns">{thing[col]||'nope'} : {state.likes}</td>
+    //         </tr>
+    //     </tbody>
+    //     </table>`
+    // },
+    view: (state) => `
         <style>
             ol { list-style: decimal outside; } .red { color: red; } .green { color: green; } .strike { text-decoration: line-through } .todolist { background: aliceblue; padding: 1rem; } span.highlight { background: aqua; } #app { margin: 0 auto; padding: 2rem; max-width: 700px; }
         </style>
@@ -144,15 +171,14 @@ const App: TPico = {
         <table class="table table-striped table-hover" onmousemove="handleMousemove">
             <thead>
                 <tr>
-                <th>Remove</th>
                 <th data-for="tcol in tablecolumns">{tcol}<button onclick="sortby" data-sortby="{tcol}">^</button></th>
                 </tr>
             </thead>
             <tbody>
                 <tr data-for="thing in filteredTodos">
-                    <td><button onclick="{()=>console.log(thing)}">remove</button></td>
-                    <td data-for="col in tablecolumns">{thing[col]}
-                        <!--<ul>
+                <td data-for="col in tablecolumns">{thing[col]===undefined?'yup':thing[col]}
+                <!--<ul>
+                <td><button >remove</button></td>
                         <li data-for="item in items">{item} , {loop.index}
                             <ul>
                                 <li data-for="letter in item">{letter} :: {loop.index}</li>
@@ -165,14 +191,13 @@ const App: TPico = {
             </tbody>
             <tfoot>
                 <tr>
-                    <th colspan="{state.tablecolumns.length}" class="table-search">
+                    <th colspan="{state.tablecolumns.length+1}" class="table-search">
                         <label for="table-search">Search</label>
                         <input oninput="setFilter" id="table-search" class="form-input" type="text" placeholder="searching by ...">
-                    </th>
-                    <th>x:{state.mouse.x} y: {state.mouse.y}, {state.likes}</th>
+                    x:{state.mouse.x} y: {state.mouse.y}, {state.likes}</th>
                 </tr>
             </tfoot> </table>`
-    }
+    
 }
 
 export default App
