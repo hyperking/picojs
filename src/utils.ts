@@ -45,11 +45,12 @@ export function partText (str): string[] {
 * Converts template literal into a concatenated string
 */
 export function concatTemplate(template: string): string {
-    return partText(template).map(st=>{
+    const ptxt = partText(template)
+    return ptxt ? ptxt.map(st=>{
         if(st.includes("{")){
             return st.replace('{','').replace('}','')
         } return `"${st}"`
-    }).join(' + ');
+    }).join(' + ') : template;
 }
 
 /**

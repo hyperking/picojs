@@ -21,15 +21,21 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
             this.attr_name = attr_name
             this.as_html = str.startsWith('{@html')
             this.node = attr_name ? document.createAttribute(attr_name) : document.createTextNode(str);
+            const js_attr = (this.type===BlockTypes.ATTR && attr_name.startsWith('on'));
             if(this.$should_update) {
                 const t = this.$tmpl.replace(/{/g,'').replace(/}/g,'').replace('@html','');
-                this.$render = createRender(t, LOOPCTX);
+                this.$render = createRender(t, LOOPCTX, js_attr);
                 this.updateTxt(state, null, LOOPCTX);
-                !LOOPCTX && reactfrags.push(this);
                 if(LOOPCTX){
                     LOOPCTX.frags ? LOOPCTX.frags.push(this) : LOOPCTX.frags = [this];
+                }else{
+                    reactfrags.push(this)
+                }
+                if(js_attr){
+                    vapply_events(this.parent_node, this.attr_name.replace('on',''), this.$render())
                 }
             }
+            
             if(this.as_html){
                 this.parent_node.innerHTML = this.node.nodeValue
             }else{
@@ -64,7 +70,7 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
         //Block fields
         iter_item: string;
         state_key: string;
-        foreignKeys: any[] = [];
+        foreignKeys: any[];
         type?: BlockTypes = BlockTypes.NODE;
         $state: any[];
 
@@ -77,7 +83,6 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
             this.children = childNodes;
             this.type = type;
             attributes && attributes.forEach(attrAST=>{
-                // LOOPCTX && console.log(attrAST, this.node)
                 const [name, value, should_update] = attrAST;
                 if(SKIP_ATTRS.includes(name)) { iter_str = value; return;}
                 if(should_update){
@@ -87,7 +92,13 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
                 }
             })
 
-            if(type===BlockTypes.FORLOOP){
+            if(type===BlockTypes.NODE){
+                insertNode(this);
+                if(LOOPCTX && LOOPCTX.strategy===Strategy.PREPEND){
+                    LOOPCTX.strategy = Strategy.APPEND;
+                }
+                childNodes && this.processChildren(childNodes)
+            }else{
                 const [iter_name, iter_state_key] = iter_str.split(' in ')
                 const des_statekey = iter_state_key.startsWith('[') && JSON.parse(iter_state_key);
                 const add_sub = NESTED_BLOCK_KEYS.size === 0;
@@ -98,48 +109,58 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
                 const btree = [parent_node, id, nodeName, BlockTypes.NODE, null, childNodes, attributes]
                 this.children = [btree]
                 this.node = parent_node
-
                 this.reconcileIterable(LOOPCTX);
 
                 if(add_sub) {
-                    this.foreignKeys = [...NESTED_BLOCK_KEYS].slice(1);
-                    this.blockNodes = BLOCK_NODES.length>0 && [...BLOCK_NODES];
+                    this.foreignKeys = NESTED_BLOCK_KEYS.size>1 && [...NESTED_BLOCK_KEYS].slice(1)
+                    this.blockNodes = BLOCK_NODES && [...BLOCK_NODES];
+                    this.frags = BLOCK_FRAGS && [...BLOCK_FRAGS];
                     subscribers.push(this);
                     cleanup()
                 }
-            }else{
-                insertNode(this);
-                if(LOOPCTX&&LOOPCTX.strategy===Strategy.PREPEND){LOOPCTX.strategy = Strategy.APPEND;}
-                childNodes && this.processChildren(childNodes)
-            }
-        }
-        
-        processChildren(childNodes){
-            const applyStrategy = (Tnode) => {
-                LOOPCTX && console.log(Tnode, LOOPCTX.frags)
-                if(!Tnode) return;
-                if((LOOPCTX && LOOPCTX.frags)) {
-                    if(!this.frags) this.frags = []
-                    this.frags.push(LOOPCTX.frags)
-                }
-                if(Tnode.constructor=== IBlock && NESTED_BLOCK_KEYS.size>0) {
-                    BLOCK_NODES.push(Tnode)
-                }
-            }
-            for (let index = 0; index < childNodes.length; index++) {
-                const cnode = childNodes[index];
-                if(!cnode) continue;
-                cnode[0] = this.node;
-                applyStrategy(processNode(cnode)) 
             }
         }
 
         receive ( k, newData: any) {
-            console.log('---'+ k)
             const strategy = this.arrayStrategy(newData[this.state_key])
+            console.log('---'+ k, strategy)
             this.reconcileIterable();
-            if(this.blockNodes) this.blockNodes = strategy===Strategy.PREPEND ? [...BLOCK_NODES, ...this.blockNodes] : [...this.blockNodes, ...BLOCK_NODES];
+            if(BLOCK_NODES && this.blockNodes) this.blockNodes = strategy===Strategy.PREPEND ? [...BLOCK_NODES, ...this.blockNodes] : [...this.blockNodes, ...BLOCK_NODES];
+            if(BLOCK_FRAGS && this.frags) this.frags = strategy===Strategy.PREPEND ? [...BLOCK_FRAGS, ...this.frags] : [...this.frags, ...BLOCK_FRAGS];
             cleanup()
+        }
+
+        processChildren(childNodes){
+            const root_strategy = LOOPCTX && LOOPCTX.strategy
+            for (let index = 0; index < childNodes.length; index++) {
+                const cnode = childNodes[index];
+                if(!cnode) continue;
+                cnode[0] = this.node;
+                const tnode = processNode(cnode);
+                // const root_block = this.type===BlockTypes.FORLOOP;
+                // const is_block = tnode.type === BlockTypes.FORLOOP;
+                // const is_array = Array.isArray(tnode);
+                // const has_frags = (LOOPCTX && LOOPCTX.frags)
+                // const is_nested = NESTED_BLOCK_KEYS.size>1;
+
+                if(this.type===BlockTypes.FORLOOP && (LOOPCTX && LOOPCTX.frags)){
+                    // console.log('ITER_ITEM'+LOOPCTX.strategy+root_strategy, tnode.node, LOOPCTX.frags, this.frags)
+                    BLOCK_FRAGS = !BLOCK_FRAGS ? [LOOPCTX.frags] : BLOCK_FRAGS.concat([LOOPCTX.frags])
+                    if(root_strategy===Strategy.PREPEND){
+                        if(this.frags) this.frags = root_strategy===Strategy.PREPEND ? [...BLOCK_FRAGS, ...this.frags] : [...this.frags, ...BLOCK_FRAGS];
+                        BLOCK_FRAGS = undefined
+                        LOOPCTX.frags = undefined
+                    }
+                        
+                }else if( LOOPCTX && LOOPCTX.pivotnode === this.node ){
+                    // console.log('LOOP ROOT ', tnode.node)
+                    tnode.frags = BLOCK_FRAGS && [...BLOCK_FRAGS];
+                    BLOCK_NODES = !BLOCK_NODES ? [tnode] : BLOCK_NODES.concat(tnode)
+                    BLOCK_FRAGS = undefined
+                    LOOPCTX.frags = undefined
+                }
+                
+            }
         }
 
         arrayStrategy(inputData?: any[]): Strategy {
@@ -172,8 +193,8 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
             const oldData: Array<any> = this.$state;
             const newData: Array<any> = state[this.state_key]||oldData;
             const [strategy, iterable, cursor] = (LOOPCTX && LOOPCTX.strategy) ? [LOOPCTX.strategy, newData, 0] : this.itemStrategy(newData);
-
-            const pivotnode: HTMLElement = strategy===Strategy.PREPEND ? this.node.firstChild : this.node;
+            const iter_pivot = this.frags && this.frags[(strategy===Strategy.APPEND?cursor-1 : 0)][0].parent_node
+            const pivotnode: HTMLElement = iter_pivot || (strategy===Strategy.PREPEND ? this.node.firstChild : this.node);
             for (let index = 0; index < iterable.length; index++) {
 
                 LOOPCTX = {
@@ -184,31 +205,32 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
                     loop: {index: (strategy===Strategy.NEW ? index : cursor+index)},
                     outer: outerctx
                 }
-                if(strategy===Strategy.APPEND||strategy===Strategy.PREPEND||!IS_READY){
+                if(strategy===Strategy.APPEND || strategy===Strategy.PREPEND || !IS_READY){
                     this.processChildren(this.children);
                 } else {
-                    if(this.blockNodes && this.blockNodes[index].constructor.name==='IBlock') {
+                    if(this.blockNodes && this.blockNodes[index].type === BlockTypes.FORLOOP) {
                         this.blockNodes[index].reconcileIterable(LOOPCTX)
                     }else{
                         update('', this.frags[index])
                     }
                 }
-            }
+            } //end forloop
             this.$state = newData
+
         }
     }
 
     class IBlock extends INode { }
 
-    function createRender(t:string, iloop?: LoopCtx, inline?: boolean): Function {
+    function createRender(t:string, iloop?: LoopCtx, is_js?: boolean): Function {
         const outerctx = (iloop && iloop.outer) && iloop.outer.iter_item;
-        let locals = inline && iloop ? [`const ${iloop.iter_item} = ${JSON.stringify(iloop.iter_value)};`,`const loop = ${JSON.stringify(iloop.loop)};`, 
+        let locals = iloop ? [`const ${iloop.iter_item} = ${JSON.stringify(iloop.iter_value)};`,`const loop = ${JSON.stringify(iloop.loop)};`, 
         (outerctx ? `const ${iloop.outer.iter_item} = ${JSON.stringify(iloop.outer.iter_value)}; \n const outerloop = ${JSON.stringify(iloop.outer.loop)};` : '')].join('\n') : '';
-        if(locals){
+        if(locals && is_js){
             return new Function('state', locals+'\n return '+t)
         }
         return iloop ? new Function("state", iloop.iter_item, "loop", outerctx, "outerloop", "return " + t ) : Function("state", "return " + t );
-    }
+    }   
 
     function processFrag(textContent: string, parent_node: HTMLElement){
         const txtparts = partText(textContent);
@@ -266,7 +288,8 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
 
     function cleanup(){
         NESTED_BLOCK_KEYS.clear();
-        BLOCK_NODES.length = 0;
+        BLOCK_NODES = undefined;
+        BLOCK_FRAGS = undefined;
         LOOPCTX = undefined;
     }
 
@@ -287,7 +310,7 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
         //sweap garbage
         detach && detach.forEach(id=> reactfrags.splice(id, 1))
         key && subscribers.forEach((isub: IBlock)=> {
-            if(isub.state_key===key || isub.foreignKeys.includes(key)) isub.receive(key, state);
+            if(isub.state_key===key || isub.foreignKeys && isub.foreignKeys.includes(key)) isub.receive(key, state);
         }) 
     }
 
@@ -332,20 +355,17 @@ export default function Pico(obj: TPico, PRECOMPILED?: TNode[]){
     //Dispatch event handlers on target dom nodes
     function vapply_events (vnode: HTMLElement, evtType: string, callback: string | Function){
         let eventHandler = typeof callback === 'function' ? callback 
-        : callback[0]==='(' ? createRender("("+callback+")()", LOOPCTX, true)
-        // : callback[0]==='(' ? Function("("+callback+")()")
         : actions[callback] && actions[callback];
         if(!eventHandler){console.log('Unable to assign '+callback); return;}
-        // callback[0]==='(' && console.log(LOOPCTX, eventHandler)
         const Ihandler = (event) => { eventHandler(state, event); }
         vnode.addEventListener(evtType,Ihandler);
     }
 
-    let IS_READY, LOOPCTX: LoopCtx = undefined;
+    let IS_READY, LOOPCTX: LoopCtx, BLOCK_FRAGS = undefined, BLOCK_NODES = undefined;
     let NESTED_BLOCK_KEYS = new Set();
     const root = obj.root;
     const actions = {...obj.actions};
-    const subscribers = [], reactfrags = [], styles=[], BLOCK_NODES = [];
+    const subscribers = [], reactfrags = [], styles=[];
     const state = createState(obj.state || {});
     if(obj.beforemount){
         obj.beforemount(state)
