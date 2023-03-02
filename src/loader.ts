@@ -1,6 +1,6 @@
 import { domToAST, htmlToDom} from "./utils";
 import Pico from "./pico";
-import App from "./demo/App";
+import App from "./demo/main";
 
 // Convert 
 const appView = htmlToDom(typeof App.view==='function'? App.view(App.state) : App.view)

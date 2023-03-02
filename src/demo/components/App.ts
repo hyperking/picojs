@@ -1,7 +1,7 @@
 import { TPico, IEvent } from "@src/types";
 import ListApp from "./ListApp";
 
-//@ts-ignore
+
 const App: TPico = {
     components: [ListApp],
     root: document.getElementById('app'),
@@ -11,11 +11,11 @@ const App: TPico = {
     beforemount: (state) => {
         console.log('before we mount our nodes...');
         state.tablecolumns = ['done', 'id', 'name'];
-        // function spamlikes() { 
-        //     state.likes += 1 
-        //     if(state.likes === 30) {clearInterval(clearId)}
-        // }
-        // const clearId = setInterval(spamlikes, 1000)
+        function spamlikes() { 
+            state.likes += 1 
+            if(state.likes === 30) {clearInterval(clearId)}
+        }
+        const clearId = setInterval(spamlikes, 1000)
         
     },
     actions: {
